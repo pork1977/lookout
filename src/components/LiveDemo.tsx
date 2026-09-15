@@ -1,233 +1,220 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { ObjectDetection, DetectedObject } from "@tensorflow-models/coco-ssd";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import CameraTile from "./live-demo/CameraTile";
+import CameraPicker from "./live-demo/CameraPicker";
+import DetectionList from "./live-demo/DetectionList";
+import { useMediaDevices } from "@/lib/useMediaDevices";
+import { useThemeColor } from "@/lib/useThemeColor";
+import type { TrackedDetection } from "./live-demo/types";
 
-type DemoStatus =
-  | "idle"
-  | "requesting-camera"
-  | "loading-model"
-  | "running"
-  | "camera-denied"
-  | "unsupported"
-  | "error";
-
-const BOX_COLOR = "#5cf2a3";
+const EXTRA_COLORS = ["#38bdf8", "#fb923c", "#f472b6"];
+const MAX_CAMERAS = 4;
 
 export default function LiveDemo() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const modelRef = useRef<ObjectDetection | null>(null);
-  const rafRef = useRef<number | null>(null);
+  const { cameras, hasLabels, refresh } = useMediaDevices();
+  const accent = useThemeColor("--accent", "#5cf2a3");
 
-  const [status, setStatus] = useState<DemoStatus>("idle");
-  const [liveCount, setLiveCount] = useState(0);
+  // Index 0 is always the primary tile (starts on click, stays mounted for
+  // its whole life — switching its device swaps the stream in place rather
+  // than remounting). Any further entries are grid additions the user
+  // picked explicitly, so they're safe to auto-start immediately.
+  const [activeIds, setActiveIds] = useState<Array<string | undefined>>([undefined]);
+  const [hasStarted, setHasStarted] = useState(false);
+  const [detectionsByCamera, setDetectionsByCamera] = useState<Record<string, TrackedDetection[]>>(
+    {},
+  );
+  const [expanded, setExpanded] = useState(false);
+  const [entered, setEntered] = useState(false);
 
-  const stop = useCallback(() => {
-    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-    rafRef.current = null;
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-    setStatus("idle");
-    setLiveCount(0);
+  useEffect(() => {
+    // entered starts (and is left) false whenever this effect isn't the
+    // "open" case — either at mount, or because closeExpand() already set
+    // it directly before expanded catches up on the next tick.
+    if (!expanded) return;
+    const raf = requestAnimationFrame(() => setEntered(true));
+    document.body.style.overflow = "hidden";
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") closeExpand();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      cancelAnimationFrame(raf);
+      document.body.style.overflow = "";
+      document.removeEventListener("keydown", onKeyDown);
+    };
+     
+  }, [expanded]);
+
+  function closeExpand() {
+    setEntered(false);
+    window.setTimeout(() => setExpanded(false), 220);
+  }
+
+  const colorFor = useCallback(
+    (i: number) => (i === 0 ? accent : EXTRA_COLORS[(i - 1) % EXTRA_COLORS.length]),
+    [accent],
+  );
+
+  const labelFor = useCallback(
+    (deviceId: string | undefined, i: number) => {
+      const found = deviceId ? cameras.find((c) => c.deviceId === deviceId) : undefined;
+      return found?.label || `Camera ${i + 1}`;
+    },
+    [cameras],
+  );
+
+  const handleDetections = useCallback((cameraLabel: string, detections: TrackedDetection[]) => {
+    setDetectionsByCamera((prev) => ({ ...prev, [cameraLabel]: detections }));
   }, []);
 
-  useEffect(() => stop, [stop]);
+  const handlePrimaryStart = useCallback(
+    (deviceId?: string) => {
+      setHasStarted(true);
+      refresh();
+      if (deviceId) setActiveIds((prev) => [deviceId, ...prev.slice(1)]);
+    },
+    [refresh],
+  );
 
-  const drawLoop = useCallback(() => {
-    function tick() {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      const model = modelRef.current;
-      if (!video || !canvas || !model || video.readyState < 2) {
-        rafRef.current = requestAnimationFrame(tick);
-        return;
+  // Radio behavior: replace whichever camera is primary with this one.
+  function selectPrimary(deviceId: string) {
+    setActiveIds([deviceId]);
+  }
+
+  // Checkbox behavior (compare mode): add/remove this camera from the grid.
+  function toggleGridMember(deviceId: string) {
+    setActiveIds((prev) => {
+      if (prev.includes(deviceId)) {
+        return prev.length > 1 ? prev.filter((id) => id !== deviceId) : prev;
       }
+      return prev.length >= MAX_CAMERAS ? prev : [...prev, deviceId];
+    });
+  }
 
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+  function collapseToSingle() {
+    setActiveIds((prev) => [prev[0]]);
+  }
 
-      if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-      }
+  function removeCamera(index: number) {
+    setActiveIds((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev));
+  }
 
-      model.detect(video).then((predictions: DetectedObject[]) => {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        setLiveCount(predictions.length);
+  const grid = activeIds.length > 1;
 
-        for (const p of predictions) {
-          const [x, y, w, h] = p.bbox;
-          const label = `${p.class} ${Math.round(p.score * 100)}%`;
-          const bracket = Math.min(w, h) * 0.22;
-
-          ctx.strokeStyle = BOX_COLOR;
-          ctx.lineWidth = 3;
-          ctx.lineJoin = "round";
-
-          const corners: Array<[number, number, number, number]> = [
-            [x, y, bracket, 0],
-            [x, y, 0, bracket],
-            [x + w, y, -bracket, 0],
-            [x + w, y, 0, bracket],
-            [x, y + h, bracket, 0],
-            [x, y + h, 0, -bracket],
-            [x + w, y + h, -bracket, 0],
-            [x + w, y + h, 0, -bracket],
-          ];
-          for (const [cx, cy, dx, dy] of corners) {
-            ctx.beginPath();
-            ctx.moveTo(cx, cy);
-            ctx.lineTo(cx + dx, cy + dy);
-            ctx.stroke();
-          }
-
-          ctx.font = "600 15px var(--font-sans, sans-serif)";
-          const textWidth = ctx.measureText(label).width;
-          ctx.fillStyle = BOX_COLOR;
-          ctx.fillRect(x, Math.max(0, y - 26), textWidth + 16, 24);
-          ctx.fillStyle = "#06170f";
-          ctx.fillText(label, x + 8, Math.max(0, y - 26) + 17);
-        }
-
-        rafRef.current = requestAnimationFrame(tick);
-      });
-    }
-
-    tick();
-  }, []);
-
-  const start = useCallback(async () => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setStatus("unsupported");
-      return;
-    }
-
-    setStatus("requesting-camera");
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 960 }, height: { ideal: 720 } },
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-    } catch {
-      setStatus("camera-denied");
-      return;
-    }
-
-    setStatus("loading-model");
-    try {
-      const [tf, cocoSsd] = await Promise.all([
-        import("@tensorflow/tfjs"),
-        import("@tensorflow-models/coco-ssd"),
-      ]);
-      await tf.ready();
-      modelRef.current = await cocoSsd.load({ base: "lite_mobilenet_v2" });
-    } catch {
-      setStatus("error");
-      return;
-    }
-
-    setStatus("running");
-    rafRef.current = requestAnimationFrame(drawLoop);
-  }, [drawLoop]);
+  const allDetections = useMemo(
+    () => Object.values(detectionsByCamera).flat(),
+    [detectionsByCamera],
+  );
 
   return (
     <div className="w-full">
-      <div className="glow-ring relative aspect-video w-full overflow-hidden rounded-2xl border border-border-strong bg-surface">
-        <video
-          ref={videoRef}
-          playsInline
-          muted
-          className="absolute inset-0 h-full w-full -scale-x-100 object-cover"
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <CameraPicker
+          cameras={cameras}
+          hasLabels={hasLabels}
+          activeIds={activeIds.filter((id): id is string => !!id)}
+          maxActive={MAX_CAMERAS}
+          onSelectPrimary={selectPrimary}
+          onToggleGridMember={toggleGridMember}
+          onCollapseToSingle={collapseToSingle}
         />
-        <canvas
-          ref={canvasRef}
-          className="absolute inset-0 h-full w-full -scale-x-100 object-cover"
-        />
-
-        {status !== "running" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background/80 px-6 text-center backdrop-blur-sm">
-            {status === "idle" && (
-              <>
-                <p className="max-w-sm text-sm text-muted">
-                  This runs a real object-detection model, live, in this browser tab. Nothing is
-                  uploaded anywhere.
-                </p>
-                <button
-                  onClick={start}
-                  className="rounded-full px-6 py-3 text-sm font-semibold text-accent-ink shadow-[0_10px_30px_-8px_var(--glow)] transition-transform hover:scale-[1.03]"
-                  style={{
-                    backgroundImage: "linear-gradient(135deg, var(--accent), var(--accent-strong))",
-                  }}
-                >
-                  Try it on your camera
-                </button>
-              </>
-            )}
-            {status === "requesting-camera" && (
-              <p className="text-sm text-muted">Waiting for camera permission…</p>
-            )}
-            {status === "loading-model" && (
-              <p className="text-sm text-muted animate-scan-pulse">
-                Loading the vision model into this tab…
-              </p>
-            )}
-            {status === "camera-denied" && (
-              <div className="max-w-sm space-y-3">
-                <p className="text-sm text-foreground">
-                  Camera access was blocked. Allow camera permission for this site and try again.
-                </p>
-                <button
-                  onClick={start}
-                  className="rounded-full border border-border-strong px-5 py-2.5 text-sm font-medium hover:bg-surface-raised"
-                >
-                  Try again
-                </button>
-              </div>
-            )}
-            {status === "unsupported" && (
-              <p className="max-w-sm text-sm text-foreground">
-                This browser doesn&apos;t support camera access. Try the latest Chrome, Edge,
-                Firefox, or Safari.
-              </p>
-            )}
-            {status === "error" && (
-              <p className="max-w-sm text-sm text-foreground">
-                The vision model failed to load. Check your connection and try again.
-              </p>
-            )}
-          </div>
-        )}
-
-        {status === "running" && (
-          <div className="absolute left-4 top-4 flex items-center gap-2 rounded-full bg-background/70 px-3 py-1.5 backdrop-blur-sm">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
-            </span>
-            <span className="text-xs font-medium text-foreground">
-              {liveCount > 0
-                ? `Tracking ${liveCount} object${liveCount === 1 ? "" : "s"}`
-                : "Watching…"}
-            </span>
-          </div>
-        )}
-
-        {status === "running" && (
+        {hasStarted && (
           <button
-            onClick={stop}
-            className="absolute right-4 top-4 rounded-full bg-background/70 px-3 py-1.5 text-xs font-medium text-foreground backdrop-blur-sm hover:bg-background/90"
+            onClick={() => setExpanded(true)}
+            className="hidden items-center gap-1.5 rounded-full border border-border-strong px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-surface-raised lg:flex"
           >
-            Stop
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={1.6}>
+              <path d="M6 2H2v4M10 14h4v-4M14 2 9 7M2 14l5-5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Expand
           </button>
         )}
       </div>
+
+      {/* Single persistent wrapper: only its own styling toggles between
+          inline flow and a fixed centered overlay, so the camera tiles
+          underneath never remount (and never drop their MediaStream) when
+          this expands or collapses. */}
+      <div
+        onClick={
+          expanded
+            ? (e) => {
+                if (e.target === e.currentTarget) closeExpand();
+              }
+            : undefined
+        }
+        style={
+          expanded
+            ? {
+                position: "fixed",
+                inset: 0,
+                zIndex: 50,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "1.5rem",
+                background: entered ? "rgba(3,5,4,0.75)" : "rgba(3,5,4,0)",
+                backdropFilter: entered ? "blur(8px)" : "none",
+                transition: "background 250ms ease, backdrop-filter 250ms ease",
+              }
+            : undefined
+        }
+      >
+        <div
+          className={expanded ? "glow-ring w-full rounded-2xl border border-border-strong bg-background" : "w-full"}
+          style={
+            expanded
+              ? {
+                  maxWidth: "1180px",
+                  padding: "1.25rem",
+                  maxHeight: "calc(100vh - 3rem)",
+                  overflowY: "auto",
+                  transform: entered ? "scale(1)" : "scale(0.94)",
+                  opacity: entered ? 1 : 0,
+                  transition: "transform 280ms cubic-bezier(0.2,0.8,0.2,1), opacity 220ms ease",
+                }
+              : undefined
+          }
+        >
+          {expanded && (
+            <div className="mb-4 flex items-center justify-between">
+              <span className="text-sm font-semibold text-foreground">Live detection</span>
+              <button
+                onClick={closeExpand}
+                className="rounded-full border border-border-strong px-3 py-1.5 text-xs font-medium text-foreground hover:bg-surface-raised"
+              >
+                Close
+              </button>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-4 lg:flex-row">
+            <div className="min-w-0 flex-1">
+              <div className={grid ? "grid grid-cols-1 gap-3 sm:grid-cols-2" : ""}>
+                {activeIds.map((deviceId, i) => (
+                  <CameraTile
+                    key={i}
+                    deviceId={deviceId}
+                    cameraLabel={labelFor(deviceId, i)}
+                    color={colorFor(i)}
+                    compact={grid}
+                    autoStart={i > 0}
+                    onDetections={handleDetections}
+                    onStart={i === 0 ? handlePrimaryStart : undefined}
+                    onRemove={i > 0 ? () => removeCamera(i) : undefined}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className={expanded ? "w-full shrink-0 lg:w-80" : "w-full shrink-0 lg:w-72"}>
+              <DetectionList detections={allDetections} showCamera={grid} />
+            </div>
+          </div>
+        </div>
+      </div>
+
       <p className="mt-3 text-center text-xs text-muted">
         This demo recognizes ~80 everyday objects out of the box. Your own custom detector (a
         specific mug, a specific gesture, whatever you like) is what the builder trains from your
