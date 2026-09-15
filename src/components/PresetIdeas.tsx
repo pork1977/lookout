@@ -48,7 +48,10 @@ export default function PresetIdeas() {
 
         <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {categories.map((category) => (
-            <div key={category.name} className="rounded-2xl border border-border bg-surface p-6">
+            <div
+              key={category.name}
+              className="rounded-2xl border border-border bg-surface p-6 transition-all hover:border-border-strong hover:shadow-[0_20px_60px_-30px_var(--glow)]"
+            >
               <h3 className="text-sm font-semibold text-accent">{category.name}</h3>
               <ul className="mt-4 space-y-3">
                 {category.examples.map((example) => (

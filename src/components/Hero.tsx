@@ -2,8 +2,17 @@ import LiveDemo from "./LiveDemo";
 
 export default function Hero() {
   return (
-    <section id="demo" className="border-b border-border py-20 sm:py-28">
-      <div className="mx-auto grid max-w-6xl gap-16 px-6 lg:grid-cols-2 lg:items-center">
+    <section id="demo" className="relative overflow-hidden border-b border-border py-20 sm:py-28">
+      <div
+        className="ambient-glow -left-40 -top-40 h-[420px] w-[420px]"
+        aria-hidden
+      />
+      <div
+        className="ambient-glow -right-32 top-1/3 h-[360px] w-[360px]"
+        style={{ background: "radial-gradient(closest-side, var(--accent-strong), transparent 70%)" }}
+        aria-hidden
+      />
+      <div className="relative mx-auto grid max-w-6xl gap-16 px-6 lg:grid-cols-2 lg:items-center">
         <div>
           <span className="inline-flex items-center gap-2 rounded-full border border-border-strong px-3 py-1 text-xs font-medium text-muted">
             <span className="h-1.5 w-1.5 rounded-full bg-accent" />
@@ -20,7 +29,10 @@ export default function Hero() {
           <div className="mt-8 flex flex-wrap items-center gap-4">
             <a
               href="#demo-frame"
-              className="rounded-full bg-accent px-6 py-3 text-sm font-semibold text-accent-ink transition-colors hover:bg-accent-strong"
+              className="rounded-full px-6 py-3 text-sm font-semibold text-accent-ink shadow-[0_10px_30px_-8px_var(--glow)] transition-transform hover:scale-[1.02]"
+              style={{
+                backgroundImage: "linear-gradient(135deg, var(--accent), var(--accent-strong))",
+              }}
             >
               Try the live demo below
             </a>

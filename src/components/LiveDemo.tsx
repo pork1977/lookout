@@ -139,7 +139,7 @@ export default function LiveDemo() {
 
   return (
     <div className="w-full">
-      <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-border-strong bg-surface">
+      <div className="glow-ring relative aspect-video w-full overflow-hidden rounded-2xl border border-border-strong bg-surface">
         <video
           ref={videoRef}
           playsInline
@@ -161,7 +161,10 @@ export default function LiveDemo() {
                 </p>
                 <button
                   onClick={start}
-                  className="rounded-full bg-accent px-6 py-3 text-sm font-semibold text-accent-ink transition-colors hover:bg-accent-strong"
+                  className="rounded-full px-6 py-3 text-sm font-semibold text-accent-ink shadow-[0_10px_30px_-8px_var(--glow)] transition-transform hover:scale-[1.03]"
+                  style={{
+                    backgroundImage: "linear-gradient(135deg, var(--accent), var(--accent-strong))",
+                  }}
                 >
                   Try it on your camera
                 </button>

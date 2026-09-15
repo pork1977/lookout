@@ -37,7 +37,10 @@ export default function HowItWorks() {
 
         <div className="mt-14 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {steps.map((step) => (
-            <div key={step.number} className="relative rounded-2xl border border-border bg-surface p-6">
+            <div
+              key={step.number}
+              className="relative rounded-2xl border border-border bg-surface p-6 transition-all hover:border-border-strong hover:shadow-[0_20px_60px_-30px_var(--glow)]"
+            >
               <span className="font-mono text-sm text-accent">{step.number}</span>
               <h3 className="mt-3 font-semibold text-foreground">{step.title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-muted">{step.body}</p>

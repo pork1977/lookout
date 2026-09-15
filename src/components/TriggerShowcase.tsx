@@ -119,7 +119,7 @@ export default function TriggerShowcase() {
           {triggers.map((trigger) => (
             <div
               key={trigger.name}
-              className="rounded-2xl border border-border bg-surface p-6 transition-colors hover:border-border-strong"
+              className="rounded-2xl border border-border bg-surface p-6 transition-all hover:border-border-strong hover:shadow-[0_20px_60px_-30px_var(--glow)]"
             >
               <div className="flex items-center justify-between">
                 <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-border-strong text-accent">

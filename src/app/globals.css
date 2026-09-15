@@ -1,17 +1,121 @@
 @import "tailwindcss";
 
+/*
+ * Theme tokens. One generator, six outputs — see src/lib/theme.ts for the
+ * hue/saturation formula these values come from. :root carries the Dark
+ * values directly so the page still looks right before the theme script
+ * runs; every other theme is an override block keyed by [data-theme].
+ */
 :root {
-  --background: #0a0d0c;
-  --surface: #121715;
-  --surface-raised: #171d1a;
-  --foreground: #f3f6f4;
-  --muted: #8d9994;
-  --border: rgba(243, 246, 244, 0.1);
-  --border-strong: rgba(243, 246, 244, 0.18);
-  --accent: #5cf2a3;
-  --accent-strong: #8dffc0;
-  --accent-ink: #06170f;
-  --warn: #ffb677;
+  --background: hsl(150 10% 5%);
+  --surface: hsl(150 10% 8%);
+  --surface-raised: hsl(150 9% 12%);
+  --foreground: hsl(150 12% 96%);
+  --muted: hsl(150 7% 62%);
+  --border: hsl(150 12% 70% / 0.1);
+  --border-strong: hsl(150 12% 75% / 0.18);
+  --accent: hsl(150 70% 62%);
+  --accent-strong: hsl(150 80% 72%);
+  --accent-ink: hsl(150 45% 8%);
+  --glow: hsl(150 70% 55% / 0.35);
+  --ring: hsl(150 70% 62% / 0.5);
+  color-scheme: dark;
+}
+
+[data-theme="dark"] {
+  --background: hsl(150 10% 5%);
+  --surface: hsl(150 10% 8%);
+  --surface-raised: hsl(150 9% 12%);
+  --foreground: hsl(150 12% 96%);
+  --muted: hsl(150 7% 62%);
+  --border: hsl(150 12% 70% / 0.1);
+  --border-strong: hsl(150 12% 75% / 0.18);
+  --accent: hsl(150 70% 62%);
+  --accent-strong: hsl(150 80% 72%);
+  --accent-ink: hsl(150 45% 8%);
+  --glow: hsl(150 70% 55% / 0.35);
+  --ring: hsl(150 70% 62% / 0.5);
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --background: hsl(150 15% 96%);
+  --surface: hsl(150 15% 100%);
+  --surface-raised: hsl(150 12% 93%);
+  --foreground: hsl(150 20% 10%);
+  --muted: hsl(150 8% 38%);
+  --border: hsl(150 10% 30% / 0.1);
+  --border-strong: hsl(150 10% 25% / 0.16);
+  --accent: hsl(150 65% 34%);
+  --accent-strong: hsl(150 70% 28%);
+  --accent-ink: hsl(0 0% 100%);
+  --glow: hsl(150 65% 45% / 0.18);
+  --ring: hsl(150 65% 40% / 0.4);
+  color-scheme: light;
+}
+
+[data-theme="blue"] {
+  --background: hsl(222 55% 7%);
+  --surface: hsl(220 48% 11%);
+  --surface-raised: hsl(219 42% 16%);
+  --foreground: hsl(213 30% 97%);
+  --muted: hsl(213 15% 68%);
+  --border: hsl(213 70% 65% / 0.16);
+  --border-strong: hsl(213 80% 68% / 0.3);
+  --accent: hsl(213 90% 58%);
+  --accent-strong: hsl(205 95% 68%);
+  --accent-ink: hsl(0 0% 100%);
+  --glow: hsl(213 90% 60% / 0.45);
+  --ring: hsl(213 90% 62% / 0.5);
+  color-scheme: dark;
+}
+
+[data-theme="purple"] {
+  --background: hsl(265 45% 8%);
+  --surface: hsl(264 40% 12%);
+  --surface-raised: hsl(263 36% 17%);
+  --foreground: hsl(265 25% 97%);
+  --muted: hsl(265 12% 68%);
+  --border: hsl(265 70% 70% / 0.16);
+  --border-strong: hsl(265 75% 72% / 0.28);
+  --accent: hsl(265 85% 64%);
+  --accent-strong: hsl(280 90% 72%);
+  --accent-ink: hsl(0 0% 100%);
+  --glow: hsl(265 85% 62% / 0.42);
+  --ring: hsl(265 85% 64% / 0.5);
+  color-scheme: dark;
+}
+
+[data-theme="amber"] {
+  --background: hsl(28 42% 8%);
+  --surface: hsl(27 36% 12%);
+  --surface-raised: hsl(26 32% 17%);
+  --foreground: hsl(30 25% 97%);
+  --muted: hsl(30 12% 68%);
+  --border: hsl(30 70% 65% / 0.16);
+  --border-strong: hsl(30 75% 68% / 0.28);
+  --accent: hsl(28 90% 58%);
+  --accent-strong: hsl(38 95% 64%);
+  --accent-ink: hsl(28 60% 10%);
+  --glow: hsl(28 90% 58% / 0.4);
+  --ring: hsl(28 90% 58% / 0.5);
+  color-scheme: dark;
+}
+
+[data-theme="rose"] {
+  --background: hsl(340 42% 8%);
+  --surface: hsl(339 36% 12%);
+  --surface-raised: hsl(338 32% 17%);
+  --foreground: hsl(340 20% 97%);
+  --muted: hsl(340 12% 68%);
+  --border: hsl(340 70% 68% / 0.16);
+  --border-strong: hsl(340 75% 70% / 0.28);
+  --accent: hsl(340 85% 62%);
+  --accent-strong: hsl(350 90% 70%);
+  --accent-ink: hsl(0 0% 100%);
+  --glow: hsl(340 85% 60% / 0.42);
+  --ring: hsl(340 85% 62% / 0.5);
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -25,7 +129,6 @@
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
   --color-accent-ink: var(--accent-ink);
-  --color-warn: var(--warn);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -34,6 +137,34 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
+}
+
+* {
+  border-color: var(--border);
+}
+
+/* A soft, blurred field of accent color used behind hero/section content for
+   ambient depth. Same class, every theme, only var(--accent)/var(--glow) change. */
+.ambient-glow {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  pointer-events: none;
+  background: radial-gradient(closest-side, var(--accent), transparent 70%);
+  opacity: 0.35;
+}
+
+[data-theme="light"] .ambient-glow {
+  opacity: 0.18;
+}
+
+.glow-ring {
+  box-shadow:
+    0 0 0 1px var(--ring),
+    0 20px 60px -20px var(--glow);
 }
 
 @keyframes scan-pulse {
