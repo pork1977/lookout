@@ -21,7 +21,10 @@ export default function LiveDemo() {
   // picked explicitly, so they're safe to auto-start immediately.
   const [activeIds, setActiveIds] = useState<Array<string | undefined>>([undefined]);
   const [hasStarted, setHasStarted] = useState(false);
-  const [detectionsByCamera, setDetectionsByCamera] = useState<Record<string, TrackedDetection[]>>(
+  // Keyed by tile index (not label/order-of-arrival) so the list's order
+  // always matches the on-screen tile order, not whichever camera's frame
+  // happened to resolve first this tick.
+  const [detectionsByTile, setDetectionsByTile] = useState<Record<number, TrackedDetection[]>>(
     {},
   );
   const [expanded, setExpanded] = useState(false);
@@ -64,8 +67,8 @@ export default function LiveDemo() {
     [cameras],
   );
 
-  const handleDetections = useCallback((cameraLabel: string, detections: TrackedDetection[]) => {
-    setDetectionsByCamera((prev) => ({ ...prev, [cameraLabel]: detections }));
+  const handleDetections = useCallback((tileIndex: number, detections: TrackedDetection[]) => {
+    setDetectionsByTile((prev) => ({ ...prev, [tileIndex]: detections }));
   }, []);
 
   const handlePrimaryStart = useCallback(
@@ -103,8 +106,8 @@ export default function LiveDemo() {
   const grid = activeIds.length > 1;
 
   const allDetections = useMemo(
-    () => Object.values(detectionsByCamera).flat(),
-    [detectionsByCamera],
+    () => activeIds.flatMap((_, i) => detectionsByTile[i] ?? []),
+    [activeIds, detectionsByTile],
   );
 
   return (
@@ -189,13 +192,14 @@ export default function LiveDemo() {
             </div>
           )}
 
-          <div className="flex flex-col gap-4 lg:flex-row">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
             <div className="min-w-0 flex-1">
               <div className={grid ? "grid grid-cols-1 gap-3 sm:grid-cols-2" : ""}>
                 {activeIds.map((deviceId, i) => (
                   <CameraTile
                     key={i}
                     deviceId={deviceId}
+                    tileIndex={i}
                     cameraLabel={labelFor(deviceId, i)}
                     color={colorFor(i)}
                     compact={grid}
@@ -208,7 +212,7 @@ export default function LiveDemo() {
               </div>
             </div>
 
-            <div className={expanded ? "w-full shrink-0 lg:w-80" : "w-full shrink-0 lg:w-72"}>
+            <div className={expanded ? "w-full shrink-0 lg:min-h-0 lg:w-80" : "w-full shrink-0 lg:min-h-0 lg:w-72"}>
               <DetectionList detections={allDetections} showCamera={grid} />
             </div>
           </div>

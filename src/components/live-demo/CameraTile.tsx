@@ -17,12 +17,14 @@ type TileStatus =
 interface CameraTileProps {
   /** Which camera to request. undefined = let the browser pick a default. */
   deviceId?: string;
+  /** Position among the active tiles — used to key detections deterministically, not just for display. */
+  tileIndex: number;
   cameraLabel: string;
   color: string;
   compact?: boolean;
   /** Start immediately on mount (safe for tiles added after the user has already granted camera permission once). */
   autoStart?: boolean;
-  onDetections: (cameraLabel: string, detections: TrackedDetection[]) => void;
+  onDetections: (tileIndex: number, detections: TrackedDetection[]) => void;
   /** Fires once, the first time this tile successfully starts, with the actual device the browser picked. */
   onStart?: (deviceId: string | undefined) => void;
   onRemove?: () => void;
@@ -30,6 +32,7 @@ interface CameraTileProps {
 
 export default function CameraTile({
   deviceId,
+  tileIndex,
   cameraLabel,
   color,
   compact = false,
@@ -63,8 +66,8 @@ export default function CameraTile({
     streamRef.current = null;
     setStatus("idle");
     setLiveCount(0);
-    onDetections(cameraLabel, []);
-  }, [cameraLabel, onDetections]);
+    onDetections(tileIndex, []);
+  }, [tileIndex, onDetections]);
 
   useEffect(() => stop, [stop]);
 
@@ -100,10 +103,15 @@ export default function CameraTile({
           cameraLabel,
           cameraColor: colorNow,
         }));
-        onDetections(cameraLabel, tracked);
+        onDetections(tileIndex, tracked);
 
         predictions.forEach((p, i) => {
-          const [x, y, w, h] = p.bbox;
+          const [rawX, y, w, h] = p.bbox;
+          // The video renders mirrored (selfie view) via a CSS flip on the
+          // <video> element only — the canvas itself is NOT flipped, so text
+          // drawn on it stays readable. Boxes are mirrored manually here to
+          // line up with the mirrored video underneath.
+          const x = canvas.width - rawX - w;
           const bracket = Math.min(w, h) * 0.22;
 
           ctx.strokeStyle = colorNow;
@@ -148,7 +156,7 @@ export default function CameraTile({
     }
 
     tick();
-  }, [cameraLabel, onDetections]);
+  }, [cameraLabel, tileIndex, onDetections]);
 
   const requestStream = useCallback(
     async (targetDeviceId: string | undefined) => {
@@ -246,7 +254,7 @@ export default function CameraTile({
       }}
     >
       <video ref={videoRef} playsInline muted className="absolute inset-0 h-full w-full -scale-x-100 object-cover" />
-      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full -scale-x-100 object-cover" />
+      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full object-cover" />
 
       {status !== "running" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/80 px-6 text-center backdrop-blur-sm">
@@ -258,7 +266,7 @@ export default function CameraTile({
               </p>
               <button
                 onClick={start}
-                className="rounded-full px-6 py-3 text-sm font-semibold text-accent-ink shadow-[0_10px_30px_-8px_var(--glow)] transition-transform hover:scale-[1.03]"
+                className="whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold text-accent-ink shadow-[0_8px_20px_-8px_var(--glow)] transition-transform hover:scale-[1.03] sm:px-5 sm:py-2.5 sm:text-sm"
                 style={{ backgroundImage: "linear-gradient(135deg, var(--accent), var(--accent-strong))" }}
               >
                 Try it on your camera

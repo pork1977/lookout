@@ -8,7 +8,7 @@ export default function DetectionList({
   showCamera: boolean;
 }) {
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-border bg-surface">
+    <div className="flex h-full min-h-56 flex-col rounded-2xl border border-border bg-surface">
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <span className="text-xs font-semibold uppercase tracking-wider text-muted">
           Tracking
@@ -21,7 +21,7 @@ export default function DetectionList({
         </span>
       </div>
 
-      <div className="flex-1 space-y-1.5 overflow-y-auto p-2">
+      <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto p-2">
         {detections.length === 0 && (
           <p className="px-2 py-6 text-center text-xs text-muted">
             Nothing in frame yet.
