@@ -83,6 +83,8 @@ export interface EngineState {
   cooling: boolean;
   /** No camera has an opinion right now. */
   unknown: boolean;
+  /** Each live camera's smoothed score, which is what the votes were taken on. */
+  scores: Record<string, number>;
 }
 
 export class TriggerEngine {
@@ -121,12 +123,14 @@ export class TriggerEngine {
 
     const votes: Vote[] = [];
     const seeing: string[] = [];
+    const scores: Record<string, number> = {};
 
     for (const reading of readings) {
       const previous = this.smoothed.get(reading.cameraId);
       const value =
         previous === undefined ? reading.score : previous + SMOOTHING * (reading.score - previous);
       this.smoothed.set(reading.cameraId, value);
+      scores[reading.cameraId] = value;
 
       const vote = this.vote(value);
       votes.push(vote);
@@ -169,6 +173,6 @@ export class TriggerEngine {
       this.lastFiredAt = now;
     }
 
-    return { condition, heldMs: this.heldMs, fired, seeing, cooling: cooling && !fired, unknown };
+    return { condition, heldMs: this.heldMs, fired, seeing, cooling: cooling && !fired, unknown, scores };
   }
 }

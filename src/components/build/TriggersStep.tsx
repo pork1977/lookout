@@ -1,15 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { classifyCameraError, openCameraStream } from "@/lib/cameraStream";
 import { drawFrameForInference } from "@/lib/imageCapture";
 import { embedCanvas, predict, type TrainedHead } from "@/lib/trainer";
 import {
   DEFAULT_RULE,
   TriggerEngine,
+  type CameraReading,
   type CombineRule,
   type TriggerRule,
 } from "@/lib/triggerEngine";
+import { useMediaDevices } from "@/lib/useMediaDevices";
 import {
   DEFAULT_SPEECH,
   dispatch,
@@ -27,8 +28,28 @@ import {
 } from "@/lib/triggerActions";
 import ProgressBar from "./ProgressBar";
 import type { DetectorClass } from "./types";
+import WatchTile, { type WatchStatus } from "./WatchTile";
 
 const PREDICT_INTERVAL_MS = 120;
+
+/**
+ * Every camera costs one full MobileNet pass per tick, run one after another,
+ * so each extra camera slows every camera down. Three still reacts well inside
+ * a second on a laptop GPU; past that the dwell clock starts to feel laggy.
+ */
+const MAX_WATCH_CAMERAS = 3;
+
+interface WatchCamera {
+  uid: string;
+  deviceId?: string;
+  autoStart: boolean;
+}
+
+/** "HD Webcam (046d:085c)" reads fine in a menu but crowds a small tile. */
+function shortCameraLabel(label: string | undefined, index: number): string {
+  const trimmed = label?.replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i, "").trim();
+  return trimmed || `Camera ${index + 1}`;
+}
 
 const CLIENT_ACTIONS: Array<{ id: ClientActionId; label: string; blurb: string }> = [
   { id: "speak", label: "Say it out loud", blurb: "Web Speech, instant, works offline" },
@@ -62,17 +83,28 @@ export default function TriggersStep({
   const [emailAvailable, setEmailAvailable] = useState(true);
 
   const [armed, setArmed] = useState(false);
-  const [cameraState, setCameraState] = useState<"idle" | "starting" | "running" | "denied" | "busy">("idle");
+  const [cameras, setCameras] = useState<WatchCamera[]>([{ uid: "cam-0", autoStart: false }]);
+  const [statuses, setStatuses] = useState<Record<string, WatchStatus>>({});
+  const [live, setLive] = useState<{ scores: Record<string, number>; seeing: string[] }>({
+    scores: {},
+    seeing: [],
+  });
   const [engineState, setEngineState] = useState<{ held: number; condition: boolean; cooling: boolean } | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
   const [notifyPermission, setNotifyPermission] = useState<NotificationPermission | "unsupported">("default");
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [speech, setSpeech] = useState<SpeechOptions>({ ...DEFAULT_SPEECH });
-  const [log, setLog] = useState<Array<{ at: string; text: string; error?: string }>>([]);
+  const [log, setLog] = useState<Array<{ at: string; text: string; seenBy?: string; error?: string }>>([]);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const { cameras: devices, hasLabels, refresh: refreshDevices } = useMediaDevices();
+
+  // The loop reads these through refs so adding or removing a camera changes
+  // what it reads on the next tick without restarting it, which would reset
+  // the dwell clock.
+  const videosRef = useRef(new Map<string, HTMLVideoElement>());
+  const camerasRef = useRef(cameras);
+  const statusRef = useRef<Record<string, WatchStatus>>({});
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<number | null>(null);
   const busyRef = useRef(false);
   const engineRef = useRef<TriggerEngine | null>(null);
@@ -97,27 +129,86 @@ export default function TriggersStep({
 
   const classIndex = useMemo(() => classes.findIndex((c) => c.id === classId), [classes, classId]);
 
-  const stopCamera = useCallback(() => {
-    if (timerRef.current !== null) window.clearInterval(timerRef.current);
-    timerRef.current = null;
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-  }, []);
+  useEffect(() => {
+    camerasRef.current = cameras;
+  }, [cameras]);
 
   useEffect(
     () => () => {
-      stopCamera();
+      if (timerRef.current !== null) window.clearInterval(timerRef.current);
       if (bannerTimerRef.current !== null) window.clearTimeout(bannerTimerRef.current);
     },
-    [stopCamera],
+    [],
+  );
+
+  const registerVideo = useCallback((uid: string, video: HTMLVideoElement | null) => {
+    if (video) videosRef.current.set(uid, video);
+    else videosRef.current.delete(uid);
+  }, []);
+
+  const onCameraStatus = useCallback(
+    (uid: string, status: WatchStatus, resolvedId?: string) => {
+      statusRef.current = { ...statusRef.current, [uid]: status };
+      setStatuses(statusRef.current);
+      if (status !== "running") return;
+      // Labels only appear once permission exists, so the picker has nothing
+      // to list until the first camera is actually running.
+      void refreshDevices();
+      if (resolvedId) {
+        setCameras((prev) =>
+          prev.some((c) => c.uid === uid && c.deviceId !== resolvedId)
+            ? prev.map((c) => (c.uid === uid ? { ...c, deviceId: resolvedId } : c))
+            : prev,
+        );
+      }
+    },
+    [refreshDevices],
+  );
+
+  const removeCamera = useCallback((uid: string) => {
+    setCameras((prev) => (prev.length > 1 ? prev.filter((c) => c.uid !== uid) : prev));
+    const next = { ...statusRef.current };
+    delete next[uid];
+    statusRef.current = next;
+    setStatuses(next);
+  }, []);
+
+  const toggleDevice = useCallback(
+    (deviceId: string) => {
+      const existing = cameras.find((c) => c.deviceId === deviceId);
+      if (existing) {
+        removeCamera(existing.uid);
+        return;
+      }
+      if (cameras.length >= MAX_WATCH_CAMERAS) return;
+      setCameras((prev) => [...prev, { uid: `cam-${Date.now()}`, deviceId, autoStart: true }]);
+    },
+    [cameras, removeCamera],
+  );
+
+  const labelFor = useCallback(
+    (camera: WatchCamera, index: number) =>
+      shortCameraLabel(devices.find((d) => d.deviceId === camera.deviceId)?.label, index),
+    [devices],
   );
 
   const fire = useCallback(
-    async (confidence: number) => {
+    async (confidence: number, seenBy: string[]) => {
       const className = classes[classIndex]?.name || "something";
       const message = renderMessage(template, className, confidence);
       const at = new Date().toLocaleTimeString();
-      setLog((prev) => [{ at, text: message }, ...prev].slice(0, 8));
+      const current = camerasRef.current;
+      const seenByLabel =
+        current.length > 1
+          ? seenBy
+              .map((uid) => {
+                const index = current.findIndex((c) => c.uid === uid);
+                return index < 0 ? null : labelFor(current[index], index);
+              })
+              .filter(Boolean)
+              .join(", ")
+          : undefined;
+      setLog((prev) => [{ at, text: message, seenBy: seenByLabel || undefined }, ...prev].slice(0, 8));
 
       if (clientActions.has("speak")) speak(message, speech);
       if (clientActions.has("notify")) notify(detectorName || "Lookout", message);
@@ -142,7 +233,7 @@ export default function TriggersStep({
         }
       }
     },
-    [classes, classIndex, template, clientActions, serverTargets, detectorName, speech],
+    [classes, classIndex, template, clientActions, serverTargets, detectorName, speech, labelFor],
   );
 
   // The prediction loop calls fireRef.current, never `fire` directly, so `fire`
@@ -153,21 +244,6 @@ export default function TriggersStep({
     fireRef.current = fire;
   }, [fire]);
 
-  const startCamera = useCallback(async () => {
-    setCameraState("starting");
-    try {
-      const stream = await openCameraStream(undefined, { facingMode: "user" });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      setCameraState("running");
-    } catch (err) {
-      setCameraState(classifyCameraError(err));
-    }
-  }, []);
-
   // Keep the engine's rule current without rebuilding it, so changing a dwell
   // mid-watch doesn't throw away the time already accumulated.
   useEffect(() => {
@@ -175,7 +251,7 @@ export default function TriggersStep({
   }, [rule, classId]);
 
   useEffect(() => {
-    if (!armed || cameraState !== "running" || !head || classIndex < 0) return;
+    if (!armed || !head || classIndex < 0) return;
 
     if (!canvasRef.current) canvasRef.current = document.createElement("canvas");
     const canvas = canvasRef.current;
@@ -184,20 +260,35 @@ export default function TriggersStep({
     let cancelled = false;
 
     timerRef.current = window.setInterval(async () => {
-      const video = videoRef.current;
-      if (!video || video.readyState < 2 || busyRef.current) return;
+      if (busyRef.current) return;
       busyRef.current = true;
       try {
-        drawFrameForInference(video, canvas);
-        const scores = await predict(head, await embedCanvas(canvas));
-        if (cancelled) return;
-        // One camera here, the same engine takes a reading per camera once a
-        // detector can watch several at once.
-        const state = engine.update([{ cameraId: "primary", score: scores[classIndex] }], Date.now());
+        // One reading per running camera, taken in turn through the same
+        // canvas. The engine decides what several readings add up to.
+        const readings: CameraReading[] = [];
+        for (const { uid } of camerasRef.current) {
+          if (statusRef.current[uid] !== "running") continue;
+          const video = videosRef.current.get(uid);
+          if (!video || video.readyState < 2) continue;
+          try {
+            drawFrameForInference(video, canvas);
+            const scores = await predict(head, await embedCanvas(canvas));
+            readings.push({ cameraId: uid, score: scores[classIndex] });
+          } catch {
+            /* one camera dropping a frame shouldn't cost the others theirs */
+          }
+          if (cancelled) return;
+        }
+        if (readings.length === 0) return;
+
+        const state = engine.update(readings, Date.now());
         setEngineState({ held: state.heldMs, condition: state.condition, cooling: state.cooling });
-        if (state.fired) void fireRef.current(scores[classIndex]);
-      } catch {
-        /* a dropped frame isn't worth tearing the loop down */
+        setLive({ scores: state.scores, seeing: state.seeing });
+        if (state.fired) {
+          const seen = readings.filter((r) => state.seeing.includes(r.cameraId));
+          const confidence = Math.max(...(seen.length ? seen : readings).map((r) => r.score));
+          void fireRef.current(confidence, state.seeing);
+        }
       } finally {
         busyRef.current = false;
       }
@@ -208,11 +299,16 @@ export default function TriggersStep({
       if (timerRef.current !== null) window.clearInterval(timerRef.current);
       timerRef.current = null;
       engineRef.current = null;
+      setLive({ scores: {}, seeing: [] });
+      setEngineState(null);
     };
     // `rule` is applied through setRule above; re-running here would restart the
     // dwell clock on every keystroke in the settings.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [armed, cameraState, head, classIndex, classId]);
+  }, [armed, head, classIndex, classId]);
+
+  const anyRunning = Object.values(statuses).includes("running");
+  const activeDeviceIds = cameras.map((c) => c.deviceId).filter((id): id is string => !!id);
 
   const activeClassName = classes[classIndex]?.name || "Untitled group";
   const previewMessage = renderMessage(template, activeClassName, 0.92);
@@ -297,29 +393,41 @@ export default function TriggersStep({
               />
             </div>
 
-            <div className="mt-6">
-              <span className="text-xs font-semibold text-foreground">With several cameras</span>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {(["any", "all"] as CombineRule[]).map((mode) => (
-                  <button
-                    key={mode}
-                    onClick={() => setRule((r) => ({ ...r, combine: mode }))}
-                    className="rounded-full border px-3.5 py-1.5 text-xs transition-colors"
-                    style={{
-                      borderColor: rule.combine === mode ? "var(--accent)" : "var(--border-strong)",
-                      color: rule.combine === mode ? "var(--accent)" : "var(--foreground)",
-                    }}
-                  >
-                    {mode === "any" ? "Any camera sees it" : "Every camera agrees"}
-                  </button>
-                ))}
-              </div>
-              <p className="mt-2 text-xs leading-relaxed text-muted">
-                {rule.combine === "any"
-                  ? "Right for “something is there”, and for cameras watching different places, a camera that can't see the dog isn't evidence there's no dog."
-                  : "Right for “nothing is there”, like “I've left my desk”, one camera still seeing you proves the condition false. Cameras that can only half-see abstain rather than blocking."}
+            {/* Only meaningful with two or more cameras. With one, "any" and
+                "every" are the same rule, so showing the choice would just be
+                a control that does nothing. */}
+            {cameras.length < 2 ? (
+              <p className="mt-6 text-xs leading-relaxed text-muted">
+                Watching with one camera. Add another under &ldquo;Watch with&rdquo; and you can
+                choose whether any camera or every camera has to see it.
               </p>
-            </div>
+            ) : (
+              <div className="mt-6">
+                <span className="text-xs font-semibold text-foreground">
+                  With {cameras.length} cameras
+                </span>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(["any", "all"] as CombineRule[]).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => setRule((r) => ({ ...r, combine: mode }))}
+                      className="rounded-full border px-3.5 py-1.5 text-xs transition-colors"
+                      style={{
+                        borderColor: rule.combine === mode ? "var(--accent)" : "var(--border-strong)",
+                        color: rule.combine === mode ? "var(--accent)" : "var(--foreground)",
+                      }}
+                    >
+                      {mode === "any" ? "Any camera sees it" : "Every camera agrees"}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-muted">
+                  {rule.combine === "any"
+                    ? "Right for “something is there”, and for cameras watching different places, a camera that can't see the dog isn't evidence there's no dog."
+                    : "Right for “nothing is there”, like “I've left my desk”, one camera still seeing you proves the condition false. Cameras that can only half-see abstain rather than blocking."}
+                </p>
+              </div>
+            )}
           </section>
 
           <section className="rounded-2xl border border-border bg-surface p-6">
@@ -391,7 +499,7 @@ export default function TriggersStep({
                       onChange={(e) =>
                         setServerTargets((prev) => ({ ...prev, [action.id]: e.target.value }))
                       }
-                      placeholder={disabled ? "Needs RESEND_API_KEY on the server" : action.placeholder}
+                      placeholder={disabled ? "Needs an email API key on the server" : action.placeholder}
                       className="mt-1.5 w-full rounded-xl border border-border-strong bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted focus:border-accent disabled:cursor-not-allowed disabled:opacity-50"
                     />
                   </div>
@@ -500,40 +608,62 @@ export default function TriggersStep({
         </div>
 
         <div className="space-y-4 lg:sticky lg:top-24">
-          <div
-            className="relative overflow-hidden rounded-2xl border border-border-strong bg-surface"
-            style={{ aspectRatio: "1 / 1" }}
-          >
-            <video
-              ref={videoRef}
-              playsInline
-              muted
-              className="absolute inset-0 h-full w-full -scale-x-100 object-cover"
-            />
-            {cameraState !== "running" && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/85 px-6 text-center backdrop-blur-sm">
-                {cameraState === "idle" && (
-                  <button
-                    onClick={startCamera}
-                    className="rounded-full px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_8px_20px_-8px_var(--glow)] transition-transform hover:scale-[1.03]"
-                    style={{
-                      backgroundImage: "linear-gradient(135deg, var(--accent), var(--accent-strong))",
-                    }}
-                  >
-                    Turn on your camera
-                  </button>
-                )}
-                {cameraState === "starting" && <p className="text-xs text-muted">Waiting for camera…</p>}
-                {(cameraState === "denied" || cameraState === "busy") && (
-                  <p className="max-w-sm text-sm text-foreground">
-                    {cameraState === "denied"
-                      ? "Camera access was blocked."
-                      : "That camera couldn't start."}
-                  </p>
-                )}
-              </div>
-            )}
+          <div className={cameras.length > 1 ? "grid grid-cols-2 gap-3" : ""}>
+            {cameras.map((camera, index) => (
+              <WatchTile
+                key={camera.uid}
+                uid={camera.uid}
+                deviceId={camera.deviceId}
+                label={labelFor(camera, index)}
+                autoStart={camera.autoStart}
+                compact={cameras.length > 1}
+                score={live.scores[camera.uid] ?? null}
+                seeing={live.seeing.includes(camera.uid)}
+                armed={armed}
+                onRemove={cameras.length > 1 ? removeCamera : undefined}
+                registerVideo={registerVideo}
+                onStatus={onCameraStatus}
+              />
+            ))}
           </div>
+
+          {anyRunning && hasLabels && devices.length > 1 && (
+            <div className="rounded-2xl border border-border bg-surface p-4">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-xs font-semibold text-foreground">Watch with</span>
+                <span className="text-[11px] text-muted">
+                  {cameras.length} of up to {MAX_WATCH_CAMERAS}
+                </span>
+              </div>
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                {devices.map((device, index) => {
+                  const on = activeDeviceIds.includes(device.deviceId);
+                  const disabled =
+                    (on && cameras.length === 1) || (!on && cameras.length >= MAX_WATCH_CAMERAS);
+                  return (
+                    <button
+                      key={device.deviceId}
+                      onClick={() => toggleDevice(device.deviceId)}
+                      disabled={disabled}
+                      aria-pressed={on}
+                      className="max-w-full truncate rounded-full border px-3 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                      style={{
+                        borderColor: on ? "var(--accent)" : "var(--border-strong)",
+                        background: on ? "var(--surface-raised)" : "transparent",
+                        color: on ? "var(--accent)" : "var(--foreground)",
+                      }}
+                    >
+                      {shortCameraLabel(device.label, index)}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-2.5 text-[11px] leading-relaxed text-muted">
+                Each camera is checked in turn, so every one you add slows the others a little.
+                <span className="lg:hidden"> Phones and tablets often allow only one camera at a time.</span>
+              </p>
+            </div>
+          )}
 
           <div className="rounded-2xl border border-border bg-surface p-5">
             <div className="flex items-center justify-between gap-3">
@@ -542,7 +672,7 @@ export default function TriggersStep({
               </span>
               <button
                 onClick={() => setArmed((v) => !v)}
-                disabled={cameraState !== "running"}
+                disabled={!anyRunning}
                 className="rounded-full border border-border-strong px-4 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {armed ? "Stop" : "Start watching"}
@@ -570,6 +700,7 @@ export default function TriggersStep({
                     <span className={entry.error ? "text-foreground" : "text-accent"}>
                       {entry.text}
                     </span>
+                    {entry.seenBy && <span className="text-muted"> · {entry.seenBy}</span>}
                     {entry.error && <span className="block text-muted">{entry.error}</span>}
                   </li>
                 ))}
