@@ -177,13 +177,21 @@ export default function TrainStep({
           </p>
           <button
             onClick={train}
-            className="mt-5 rounded-full px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_10px_30px_-8px_var(--glow)] transition-transform hover:scale-[1.02]"
+            disabled={totalExamples === 0}
+            className="mt-5 rounded-full px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_10px_30px_-8px_var(--glow)] transition-transform hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:hover:scale-100"
             style={{
               backgroundImage: "linear-gradient(135deg, var(--accent), var(--accent-strong))",
             }}
           >
             Start training
           </button>
+          {/* Reachable now that the step chips navigate directly. Better to say
+              what's missing than to start and fail on an empty set. */}
+          {totalExamples === 0 && (
+            <p className="mt-2 text-xs text-muted">
+              No photos yet — add some on the Examples step first.
+            </p>
+          )}
           <p className="mt-3 text-xs text-muted">
             The vision model is a one-off download of roughly 14&nbsp;MB, then cached.
           </p>

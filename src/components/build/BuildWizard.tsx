@@ -352,8 +352,15 @@ export default function BuildWizard() {
           const available = i < LIVE_STEPS;
           return (
             <li key={name} className="flex items-center gap-2">
-              <span
-                className="flex items-center gap-2 rounded-full border px-3 py-1.5 font-medium"
+              {/* Jumping straight to a step is allowed even when it can't do
+                  anything yet — every step already explains what it's waiting
+                  for, which is more useful than a control that ignores a click. */}
+              <button
+                onClick={() => setStep(i)}
+                disabled={!available}
+                aria-current={current ? "step" : undefined}
+                title={available ? `Go to ${name}` : `${name} isn't built yet`}
+                className="flex items-center gap-2 rounded-full border px-3 py-1.5 font-medium transition-colors enabled:hover:bg-surface-raised disabled:cursor-not-allowed"
                 style={{
                   borderColor: current ? "var(--accent)" : "var(--border-strong)",
                   color: current ? "var(--accent)" : available ? "var(--foreground)" : "var(--muted)",
@@ -362,7 +369,7 @@ export default function BuildWizard() {
               >
                 <span className="font-mono text-[11px]">{done ? "✓" : i + 1}</span>
                 {name}
-              </span>
+              </button>
               {i < STEPS.length - 1 && <span className="text-muted">·</span>}
             </li>
           );
