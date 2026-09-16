@@ -291,3 +291,57 @@ body {
     animation: none;
   }
 }
+
+/*
+ * Hero light trails.
+ *
+ * A bright dash is chased along each path with stroke-dashoffset, which the
+ * compositor can handle on its own — no paint work per frame, and nothing for
+ * JavaScript to do. Long gaps between dashes keep the effect sparse; a busy
+ * background would fight the live camera for attention.
+ */
+.trail-field {
+  opacity: 0.55;
+}
+
+[data-theme="light"] .trail-field {
+  opacity: 0.32;
+}
+
+.trail {
+  stroke-dasharray: 130 2600;
+  stroke-dashoffset: 2730;
+  animation: trail-run linear infinite;
+}
+
+@keyframes trail-run {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.trail-1 {
+  animation-duration: 14s;
+}
+
+.trail-2 {
+  animation-duration: 19s;
+  animation-delay: -6s;
+}
+
+.trail-3 {
+  animation-duration: 16s;
+  animation-delay: -11s;
+}
+
+.trail-4 {
+  animation-duration: 22s;
+  animation-delay: -3s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trail {
+    animation: none;
+    opacity: 0;
+  }
+}

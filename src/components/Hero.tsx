@@ -1,4 +1,5 @@
 import LiveDemo from "./LiveDemo";
+import TrailField from "./TrailField";
 
 export default function Hero() {
   // scroll-mt clears the sticky header, so the CTAs land on the section rather
@@ -13,6 +14,7 @@ export default function Hero() {
           overflow-hidden on the section itself, the camera picker's dropdown was
           cut off at the section boundary on small screens. */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+        <TrailField />
         <div className="ambient-glow -left-40 -top-40 h-[420px] w-[420px]" />
         <div
           className="ambient-glow -right-32 top-1/3 h-[360px] w-[360px]"
