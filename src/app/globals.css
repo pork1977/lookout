@@ -195,3 +195,35 @@ body {
 .animate-corner-in {
   animation: corner-in 0.18s ease-out;
 }
+
+/*
+ * Camera tile chrome.
+ *
+ * The same tile renders at roughly 250px wide in a two-up inline grid and
+ * 550px+ in the expanded overlay, so anything sized in fixed pixels either
+ * overflowed the small one or looked undersized in the large one — the
+ * "Try again" button was ending up off-tile entirely. These size from the
+ * tile's own width (cqw) instead of the viewport, clamped so text never drops
+ * below legible or grows past the original design size. Everything inside
+ * then uses em, so padding and gaps scale with it automatically.
+ */
+.tile-container {
+  container-type: inline-size;
+}
+
+.tile-chip {
+  font-size: clamp(9px, 2.4cqw, 11px);
+}
+
+.tile-body {
+  font-size: clamp(10px, 2.9cqw, 13px);
+}
+
+.tile-action {
+  font-size: clamp(10px, 3.1cqw, 14px);
+}
+
+/* Inset for the floating chips, on the same relative footing as the type. */
+.tile-inset {
+  --tile-inset: clamp(6px, 2.4cqw, 12px);
+}

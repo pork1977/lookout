@@ -529,9 +529,13 @@ function CameraTile({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deviceId]);
 
+  const chip =
+    "tile-chip flex items-center rounded-full bg-background/70 font-medium backdrop-blur-sm";
+  const chipPad = { padding: "0.35em 0.75em", gap: "0.5em" } as const;
+
   return (
     <div
-      className="relative overflow-hidden rounded-2xl border bg-surface"
+      className="tile-container tile-inset relative overflow-hidden rounded-2xl border bg-surface"
       style={{
         borderColor: status === "running" ? `${color}55` : "var(--border-strong)",
         boxShadow:
@@ -548,36 +552,49 @@ function CameraTile({
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full object-cover" />
 
       {status !== "running" && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/80 px-6 text-center backdrop-blur-sm">
+        <div
+          className="tile-body absolute inset-0 flex flex-col items-center justify-center overflow-y-auto bg-background/80 text-center backdrop-blur-sm"
+          // em throughout, so padding and gaps track the container-scaled font
+          // size rather than staying at desktop proportions on a small tile.
+          style={{ gap: "0.7em", padding: "1em 1.6em" }}
+        >
           {status === "idle" && (everStarted || !autoStart) && (
             <>
               <button
                 onClick={start}
-                className="whitespace-nowrap rounded-full px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_8px_20px_-8px_var(--glow)] transition-transform hover:scale-[1.03]"
+                className="tile-action whitespace-nowrap rounded-full font-semibold text-accent-ink shadow-[0_8px_20px_-8px_var(--glow)] transition-transform hover:scale-[1.03]"
                 style={{
+                  padding: "0.6em 1.5em",
                   backgroundImage: "linear-gradient(135deg, var(--accent), var(--accent-strong))",
                 }}
               >
                 {everStarted ? "Start camera" : "Try it on your camera"}
               </button>
               {!everStarted && (
-                <p className={compact ? "text-[11px] text-muted" : "max-w-sm text-xs text-muted"}>
+                <p className="max-w-sm text-muted" style={{ fontSize: "0.88em" }}>
                   Runs a real object-detection model live in this tab. Nothing is uploaded anywhere.
                 </p>
               )}
             </>
           )}
           {(status === "idle" && autoStart && !everStarted) || status === "requesting-camera" ? (
-            <p className="text-xs text-muted">Waiting for camera permission…</p>
+            <p className="text-muted">Waiting for camera permission…</p>
           ) : null}
           {status === "loading-model" && (
-            <p className="animate-scan-pulse text-xs text-muted">Loading the vision model…</p>
+            <p className="animate-scan-pulse text-muted">Loading the vision model…</p>
           )}
           {(status === "camera-denied" || status === "camera-busy") && (
-            <div className="max-w-sm space-y-3">
-              <p className="text-sm text-foreground">
+            <div
+              className="flex max-w-sm flex-col items-center"
+              style={{ gap: "0.75em" }}
+            >
+              <p className="text-foreground">
                 {status === "camera-denied" ? (
                   <>{cameraLabel} was blocked. Allow camera permission and try again.</>
+                ) : compact ? (
+                  // The full explanation doesn't fit a grid tile at a legible
+                  // size, so the small view gets the actionable half of it.
+                  <>{cameraLabel} couldn&apos;t start — try stopping one of the other cameras.</>
                 ) : (
                   <>
                     {cameraLabel} couldn&apos;t start. It may be in use by another app, or your USB
@@ -588,65 +605,89 @@ function CameraTile({
               </p>
               <button
                 onClick={start}
-                className="rounded-full border border-border-strong px-5 py-2 text-xs font-medium hover:bg-surface-raised"
+                className="tile-action shrink-0 whitespace-nowrap rounded-full border border-border-strong font-medium hover:bg-surface-raised"
+                style={{ padding: "0.5em 1.3em" }}
               >
                 Try again
               </button>
             </div>
           )}
           {status === "unsupported" && (
-            <p className="max-w-sm text-sm text-foreground">
+            <p className="max-w-sm text-foreground">
               This browser doesn&apos;t support camera access.
             </p>
           )}
           {status === "error" && (
-            <p className="max-w-sm text-sm text-foreground">The vision model failed to load.</p>
+            <p className="max-w-sm text-foreground">The vision model failed to load.</p>
           )}
         </div>
       )}
 
-      <div className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-background/70 px-2.5 py-1 backdrop-blur-sm">
-        <span className="relative flex h-1.5 w-1.5">
-          {status === "running" && (
+      {/* One row rather than two independently positioned clusters: the label
+          then truncates against whatever width the controls actually leave,
+          instead of against a guessed percentage that a long device name and a
+          full control set could still overrun on a narrow grid tile. */}
+      <div
+        className="absolute flex items-start justify-between"
+        style={{
+          left: "var(--tile-inset)",
+          right: "var(--tile-inset)",
+          top: "var(--tile-inset)",
+          gap: "0.5em",
+        }}
+      >
+        <div className={`${chip} min-w-0 text-foreground`} style={chipPad}>
+          <span className="relative flex h-1.5 w-1.5 shrink-0">
+            {status === "running" && (
+              <span
+                className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
+                style={{ background: color }}
+              />
+            )}
             <span
-              className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
-              style={{ background: color }}
+              className="relative inline-flex h-1.5 w-1.5 rounded-full"
+              style={{ background: status === "running" ? color : "var(--muted)" }}
             />
-          )}
-          <span
-            className="relative inline-flex h-1.5 w-1.5 rounded-full"
-            style={{ background: status === "running" ? color : "var(--muted)" }}
-          />
-        </span>
-        <span className="text-[11px] font-medium text-foreground">{cameraLabel}</span>
+          </span>
+          <span className="truncate">{cameraLabel}</span>
+        </div>
+
+        {status === "running" && (
+          <div className="flex shrink-0 items-center" style={{ gap: "0.4em" }}>
+            {quality === "fast" && (
+              <span
+                title="Running the quick model while the more accurate one finishes downloading."
+                className={`${chip} animate-scan-pulse text-muted`}
+                style={chipPad}
+              >
+                refining
+              </span>
+            )}
+            <span className={`${chip} whitespace-nowrap text-muted`} style={chipPad}>
+              {liveCount > 0 ? `${liveCount} tracked` : "watching"}
+            </span>
+            <button
+              onClick={stop}
+              className={`${chip} text-foreground hover:bg-background/90`}
+              style={chipPad}
+            >
+              Stop
+            </button>
+          </div>
+        )}
       </div>
 
-      {status === "running" && (
-        <div className="absolute right-3 top-3 flex items-center gap-1.5">
-          {quality === "fast" && (
-            <span
-              title="Running the quick model while the more accurate one finishes downloading."
-              className="animate-scan-pulse rounded-full bg-background/70 px-2.5 py-1 text-[11px] font-medium text-muted backdrop-blur-sm"
-            >
-              refining
-            </span>
-          )}
-          <span className="rounded-full bg-background/70 px-2.5 py-1 text-[11px] font-medium text-muted backdrop-blur-sm">
-            {liveCount > 0 ? `${liveCount} tracked` : "watching"}
-          </span>
-          <button
-            onClick={stop}
-            className="rounded-full bg-background/70 px-2.5 py-1 text-[11px] font-medium text-foreground backdrop-blur-sm hover:bg-background/90"
-          >
-            Stop
-          </button>
-        </div>
-      )}
       {onRemove && (
         <button
           onClick={() => onRemove(uid)}
           aria-label={`Remove ${cameraLabel}`}
-          className="absolute bottom-3 right-3 flex h-6 w-6 items-center justify-center rounded-full bg-background/70 text-xs text-muted backdrop-blur-sm hover:bg-background/90 hover:text-foreground"
+          className="tile-chip absolute flex items-center justify-center rounded-full bg-background/70 text-muted backdrop-blur-sm hover:bg-background/90 hover:text-foreground"
+          style={{
+            right: "var(--tile-inset)",
+            bottom: "var(--tile-inset)",
+            width: "2em",
+            height: "2em",
+          }}
         >
           ×
         </button>
