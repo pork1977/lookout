@@ -200,11 +200,14 @@ export default function CapturePanel({
               touchAction: "none",
             }}
           >
-            Hold to capture into &ldquo;{targetName}&rdquo;
+            Hold for burst images
           </button>
+          {/* The button says what it does; the line under it says where the
+              photos land, so the target group is still unambiguous. */}
           <p className="text-center text-xs text-muted">
-            Hold for a burst, tap for a single photo. Move around between shots — varied angles and
-            lighting are what make it reliable.
+            Tap for a single photo. Both go into{" "}
+            <span className="font-medium text-foreground">&ldquo;{targetName}&rdquo;</span>. Move
+            around between shots — varied angles and lighting are what make it reliable.
           </p>
 
           {hasLabels && cameras.length > 1 && (

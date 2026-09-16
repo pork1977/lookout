@@ -90,10 +90,11 @@ export default function DescribeStep({
       </div>
 
       <aside className="rounded-2xl border border-border bg-surface p-6 lg:sticky lg:top-24">
-        <h2 className="text-sm font-semibold text-foreground">Groups to sort photos into</h2>
+        <h2 className="text-sm font-semibold text-foreground">Groups you&apos;ll photograph next</h2>
         <p className="mt-1.5 text-sm leading-relaxed text-muted">
-          A detector learns by comparison, so it needs the thing you&apos;re after{" "}
-          <em>and</em> what &ldquo;normal&rdquo; looks like. Two is usually right.
+          A detector only learns by comparison, so it needs photos of the thing you want caught{" "}
+          <em>and</em> photos of everything being normal. On the next step you&apos;ll fill each of
+          these with examples.
         </p>
 
         <div className="mt-5 space-y-2">
@@ -104,7 +105,16 @@ export default function DescribeStep({
                 value={cls.name}
                 onChange={(e) => onRenameClass(cls.id, e.target.value)}
                 aria-label={`Name for group ${i + 1}`}
-                placeholder="Name this group"
+                // Positional placeholders do the explaining: a generic "name this
+                // group" left people working out what the section was for only
+                // once they reached the capture step.
+                placeholder={
+                  i === 0
+                    ? "The thing to catch"
+                    : i === 1
+                      ? "What normal looks like"
+                      : "Another thing to catch"
+                }
                 className="min-w-0 flex-1 rounded-xl border border-border-strong bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted focus:border-accent"
               />
               <button
@@ -131,6 +141,10 @@ export default function DescribeStep({
         >
           Add another group
         </button>
+        {/* Kept away from the explanation above: "two is usually right" sitting
+            next to "a detector needs both" read as two rules contradicting each
+            other rather than one rule and one hint. */}
+        <p className="mt-2 text-xs text-muted">Most detectors only need two.</p>
 
         <div className="mt-6 border-t border-border pt-5">
           <button

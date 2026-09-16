@@ -83,27 +83,28 @@ export default function ExamplesStep({
             >
               Back
             </button>
-            <button
-              disabled
-              className="cursor-not-allowed rounded-full px-5 py-2.5 text-sm font-semibold text-accent-ink opacity-40"
-              style={{
-                backgroundImage: "linear-gradient(135deg, var(--accent), var(--accent-strong))",
-              }}
-            >
-              Review &amp; label
-            </button>
+            {/* Deliberately not a dimmed primary button. As one, it read as
+                "you haven't met some condition" when the real answer is that
+                this step doesn't exist yet. */}
+            <div className="flex items-center gap-2 rounded-full border border-dashed border-border-strong px-4 py-2">
+              <span className="text-sm font-medium text-muted">Review &amp; label</span>
+              <span className="rounded-full bg-surface-raised px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-accent">
+                Being built
+              </span>
+            </div>
           </div>
           <p className="mt-3 text-xs leading-relaxed text-muted">
+            Your photos are ready
             {short.length > 0 ? (
               <>
-                Needs at least {MIN_PER_CLASS} photos in{" "}
-                {short.map((c) => `"${c.name || "Untitled group"}"`).join(", ")}.{" "}
+                {" "}
+                — though {short.map((c) => `"${c.name || "Untitled group"}"`).join(" and ")} still
+                {short.length === 1 ? " needs" : " need"} at least {MIN_PER_CLASS} photos before
+                training would be worth much
               </>
-            ) : (
-              <>Enough to train on. </>
-            )}
-            The review and labelling step is the next thing being built — this button turns on with
-            it.
+            ) : null}
+            . The next step, where Claude proposes a label for each photo and you only review the
+            uncertain ones, is what&apos;s being built now.
           </p>
         </div>
       </div>
