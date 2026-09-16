@@ -12,6 +12,7 @@ import {
   type CloudDetector,
   type SyncProgress,
 } from "@/lib/cloudSync";
+import * as store from "@/lib/detectorStore";
 import ProgressBar from "./ProgressBar";
 
 export default function AccountPanel({
@@ -31,6 +32,10 @@ export default function AccountPanel({
   const [cloud, setCloud] = useState<CloudDetector[]>([]);
   const [progress, setProgress] = useState<SyncProgress | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  /** local_ids already in this browser, so a backup can be shown as "not here yet". */
+  const [localIds, setLocalIds] = useState<Set<string>>(new Set());
+  const [localCounts, setLocalCounts] = useState<Record<string, number>>({});
+  const [confirmRestore, setConfirmRestore] = useState<CloudDetector | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -47,7 +52,25 @@ export default function AccountPanel({
     listCloudDetectors()
       .then(setCloud)
       .catch((err) => setMessage(err instanceof Error ? err.message : "Couldn't list backups."));
+    // Which backups are already on this machine decides what the list says, and
+    // whether restoring one would replace newer work.
+    store
+      .listDetectors()
+      .then((local) => {
+        setLocalIds(new Set(local.map((d) => d.id)));
+        setLocalCounts(Object.fromEntries(local.map((d) => [d.id, d.exampleCount])));
+      })
+      .catch(() => undefined);
   }, [user]);
+
+  // Kept current even while the panel is shut, so the pill can show that there
+  // are backups this browser hasn't got. Landing on a fresh browser and seeing
+  // an empty library was the confusing part.
+  useEffect(() => {
+    if (user) refreshCloud();
+  }, [user, refreshCloud]);
+
+  const missingHere = cloud.filter((item) => !localIds.has(item.localId)).length;
 
   useEffect(() => {
     if (open && user) refreshCloud();
@@ -94,6 +117,15 @@ export default function AccountPanel({
             existing-users-only, which is exactly how it got missed. "Account"
             covers both, and the dot carries the signed-in state. */}
         Account
+        {missingHere > 0 && (
+          <span
+            className="rounded-full px-1.5 font-mono text-[10px] font-semibold"
+            style={{ background: "var(--accent)", color: "var(--accent-ink)" }}
+            title={`${missingHere} backup${missingHere === 1 ? "" : "s"} not on this browser yet`}
+          >
+            {missingHere}
+          </span>
+        )}
       </button>
 
       {open && (
@@ -226,22 +258,34 @@ export default function AccountPanel({
                     <div key={item.id} className="flex items-center gap-2">
                       <button
                         disabled={busy}
-                        onClick={() =>
-                          withBusy("Restore", async () => {
+                        onClick={() => {
+                          const localCount = localCounts[item.localId];
+                          // Restoring replaces the local copy, so if this
+                          // browser holds more photos than the backup does,
+                          // going ahead silently would destroy work.
+                          if (localCount !== undefined && localCount > item.exampleCount) {
+                            setConfirmRestore(item);
+                            return;
+                          }
+                          void withBusy("Restore", async () => {
                             const localId = await restoreDetector(item.id, setProgress);
                             onRestored(localId);
                             setMessage("Brought back to this browser.");
                             setOpen(false);
-                          })
-                        }
+                          });
+                        }}
                         className="min-w-0 flex-1 rounded-lg px-2 py-2 text-left hover:bg-surface-raised disabled:opacity-40"
                       >
                         <span className="block truncate text-sm text-foreground">
                           {item.name || "Untitled detector"}
                         </span>
                         <span className="block text-[11px] text-muted">
-                          {item.exampleCount} photo{item.exampleCount === 1 ? "" : "s"} · tap to
-                          bring back
+                          {item.exampleCount} photo{item.exampleCount === 1 ? "" : "s"} ·{" "}
+                          {localIds.has(item.localId) ? (
+                            "already on this browser"
+                          ) : (
+                            <span className="text-accent">not here yet, tap to bring it back</span>
+                          )}
                         </span>
                       </button>
                       <button
@@ -259,8 +303,46 @@ export default function AccountPanel({
                       </button>
                     </div>
                   ))}
+                  {confirmRestore && (
+                    <div className="mt-2 rounded-xl border border-border-strong p-2.5">
+                      <p className="text-[11px] leading-relaxed text-foreground">
+                        This browser has {localCounts[confirmRestore.localId]} photos for
+                        &ldquo;{confirmRestore.name || "Untitled detector"}&rdquo;, but the backup
+                        only has {confirmRestore.exampleCount}.
+                      </p>
+                      <p className="mt-1 text-[11px] leading-relaxed text-muted">
+                        Bringing it back replaces what is here, so the extra photos would be lost.
+                        Back up first if you want to keep them.
+                      </p>
+                      <div className="mt-2 flex gap-2">
+                        <button
+                          onClick={() => setConfirmRestore(null)}
+                          className="flex-1 rounded-full border border-border-strong px-3 py-1.5 text-[11px] font-medium text-foreground hover:bg-surface-raised"
+                        >
+                          Leave it alone
+                        </button>
+                        <button
+                          onClick={() => {
+                            const target = confirmRestore;
+                            setConfirmRestore(null);
+                            void withBusy("Restore", async () => {
+                              const localId = await restoreDetector(target.id, setProgress);
+                              onRestored(localId);
+                              setMessage("Brought back to this browser.");
+                              setOpen(false);
+                            });
+                          }}
+                          className="flex-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold"
+                          style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
+                        >
+                          Replace anyway
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   <p className="px-1 pt-1 text-[11px] leading-relaxed text-muted">
-                    Bringing one back replaces the local copy of that detector.
+                    Bringing one back replaces the local copy of that detector. Nothing syncs on its
+                    own, so use these buttons when you want it to.
                   </p>
                 </div>
               )}
