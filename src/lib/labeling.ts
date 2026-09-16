@@ -3,8 +3,18 @@
  * No server-only imports here — the client imports this too.
  */
 
-/** Images per request. Keeps one call well inside token and body limits. */
+/** Server-side ceiling per request. Keeps one call well inside token and body limits. */
 export const MAX_IMAGES_PER_REQUEST = 12;
+
+/**
+ * What the client actually sends per request.
+ *
+ * Deliberately below the server cap: one call returns all of its verdicts at
+ * once, so the batch size *is* the progress granularity. At 12 a ten-photo run
+ * went straight from 0 to 10. Six keeps the count moving without turning every
+ * run into twice the round trips.
+ */
+export const CLIENT_BATCH_SIZE = 6;
 
 /** Ceiling for one pass over a draft, enforced client-side before batching. */
 export const MAX_IMAGES_PER_RUN = 120;
@@ -58,7 +68,7 @@ export interface LabelAvailability {
 }
 
 /** Splits a list into request-sized batches. */
-export function batchImages<T>(items: T[], size = MAX_IMAGES_PER_REQUEST): T[][] {
+export function batchImages<T>(items: T[], size = CLIENT_BATCH_SIZE): T[][] {
   const batches: T[][] = [];
   for (let i = 0; i < items.length; i += size) batches.push(items.slice(i, i + size));
   return batches;

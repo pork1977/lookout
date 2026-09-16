@@ -14,6 +14,7 @@ import {
   type TrainedHead,
   type TrainingSample,
 } from "@/lib/trainer";
+import ProgressBar from "./ProgressBar";
 import type { DetectorClass } from "./types";
 
 type Phase = "idle" | "loading-model" | "embedding" | "training" | "trained" | "error";
@@ -204,21 +205,20 @@ export default function TrainStep({
                 ? `Training — pass ${epoch.epoch} of ${epoch.totalEpochs}`
                 : "Training…")}
           </p>
-          <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-surface-raised">
-            <div
-              className="h-full rounded-full transition-[width] duration-200"
-              style={{
-                width: `${
-                  phase === "embedding"
-                    ? prepared.total
-                      ? (prepared.done / prepared.total) * 100
-                      : 0
-                    : phase === "training" && epoch
-                      ? (epoch.epoch / epoch.totalEpochs) * 100
-                      : 8
-                }%`,
-                background: "linear-gradient(90deg, var(--accent), var(--accent-strong))",
-              }}
+          <div className="mt-3">
+            {/* Downloading a model has nothing honest to count, so it sweeps
+                rather than showing an invented percentage. */}
+            <ProgressBar
+              indeterminate={phase === "loading-model" || (phase === "training" && !epoch)}
+              value={
+                phase === "embedding"
+                  ? prepared.total
+                    ? prepared.done / prepared.total
+                    : 0
+                  : epoch
+                    ? epoch.epoch / epoch.totalEpochs
+                    : 0
+              }
             />
           </div>
           {phase === "training" && epoch && (
@@ -345,7 +345,10 @@ export default function TrainStep({
                             background: isLeader
                               ? "linear-gradient(90deg, var(--accent), var(--accent-strong))"
                               : "var(--border-strong)",
-                            transition: "width 140ms ease",
+                            boxShadow: isLeader ? "0 0 14px -2px var(--glow)" : undefined,
+                            // Short and eased: long enough to read as movement,
+                            // short enough to still feel live at 8 frames a second.
+                            transition: "width 130ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 200ms ease",
                           }}
                         />
                       </div>

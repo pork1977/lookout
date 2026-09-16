@@ -121,6 +121,15 @@ export default function CameraPicker({
             >
               {compareMode ? "Back to a single camera" : "Compare multiple cameras"}
             </button>
+            {/* A warning rather than hiding the option: running two cameras at
+                once is a per-device limit, not a blanket mobile one. iOS Safari
+                effectively allows one at a time; plenty of Android hardware
+                manages two. Hiding it would take the feature away from phones
+                that can do it, so the honest move is to set expectations and
+                let the failure path explain itself if it can't. */}
+            <p className="px-2.5 pb-1 pt-0.5 text-[11px] leading-relaxed text-muted lg:hidden">
+              Phones and tablets often allow only one camera at a time.
+            </p>
           </div>
         </div>
       )}

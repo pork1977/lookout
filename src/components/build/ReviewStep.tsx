@@ -9,6 +9,7 @@ import {
   type LabelRequestImage,
   type LabelResult,
 } from "@/lib/labeling";
+import ProgressBar from "./ProgressBar";
 import type { DetectorClass, ExampleImage } from "./types";
 
 type RunState = "idle" | "running" | "done" | "error";
@@ -210,16 +211,13 @@ export default function ReviewStep({
       {state === "running" && (
         <div className="rounded-2xl border border-border bg-surface p-6">
           <p className="text-sm font-medium text-foreground">
-            Checking {progress.done} of {progress.total}…
+            Checked {progress.done} of {progress.total}
+            {progress.done < progress.total && (
+              <span className="text-muted"> · looking at the next few…</span>
+            )}
           </p>
-          <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-surface-raised">
-            <div
-              className="h-full rounded-full transition-[width] duration-300"
-              style={{
-                width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%`,
-                background: "linear-gradient(90deg, var(--accent), var(--accent-strong))",
-              }}
-            />
+          <div className="mt-3">
+            <ProgressBar value={progress.total ? progress.done / progress.total : 0} />
           </div>
         </div>
       )}

@@ -227,3 +227,44 @@ body {
 .tile-inset {
   --tile-inset: clamp(6px, 2.4cqw, 12px);
 }
+
+/*
+ * Progress bars.
+ *
+ * A bar that only jumps when a network call returns looks stalled in between,
+ * so the fill carries a travelling sheen while work is in flight, and phases
+ * with nothing to count get an indeterminate sweep instead of a fake number.
+ */
+@keyframes progress-sheen {
+  from {
+    transform: translateX(-130%);
+  }
+  to {
+    transform: translateX(230%);
+  }
+}
+
+.animate-progress-sheen {
+  animation: progress-sheen 1.5s ease-in-out infinite;
+}
+
+@keyframes progress-sweep {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+
+.animate-progress-sweep {
+  animation: progress-sweep 1.3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-progress-sheen,
+  .animate-progress-sweep,
+  .animate-scan-pulse {
+    animation: none;
+  }
+}
