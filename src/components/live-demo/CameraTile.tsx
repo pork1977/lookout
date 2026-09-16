@@ -3,6 +3,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { DetectedObject } from "@tensorflow-models/coco-ssd";
 import { ADMIT_SCORE, detect, detectorQuality, startDetector } from "@/lib/detectorModel";
+import { useDetectorEngine } from "./SharperToggle";
 import { inkFor } from "@/lib/colorInk";
 import { classifyCameraError, openCameraStream } from "@/lib/cameraStream";
 import type { TrackedDetection } from "./types";
@@ -112,6 +113,7 @@ function CameraTile({
    * way back, showing "waiting for permission" forever. This splits the two.
    */
   const [everStarted, setEverStarted] = useState(false);
+  const detectorEngine = useDetectorEngine();
 
   // The detector starts on the small base and swaps itself for the accurate one
   // a few seconds later. Polling for that is worth the handful of lines: without
@@ -605,7 +607,7 @@ function CameraTile({
 
         {status === "running" && (
           <div className="flex shrink-0 items-center" style={{ gap: "0.4em" }}>
-            {quality === "fast" && (
+            {quality === "fast" && detectorEngine.engine === "standard" && (
               <span
                 title="Running the quick model while the more accurate one finishes downloading."
                 className={`${chip} animate-scan-pulse text-muted`}
