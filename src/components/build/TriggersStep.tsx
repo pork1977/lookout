@@ -109,6 +109,7 @@ export default function TriggersStep({
   // what it reads on the next tick without restarting it, which would reset
   // the dwell clock.
   const videosRef = useRef(new Map<string, HTMLVideoElement>());
+  const nextUid = useRef(0);
   const camerasRef = useRef(cameras);
   const statusRef = useRef<Record<string, WatchStatus>>({});
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -188,7 +189,9 @@ export default function TriggersStep({
         return;
       }
       if (cameras.length >= MAX_WATCH_CAMERAS) return;
-      setCameras((prev) => [...prev, { uid: `cam-${Date.now()}`, deviceId, autoStart: true }]);
+      nextUid.current += 1;
+      const uid = `cam-${nextUid.current}`;
+      setCameras((prev) => [...prev, { uid, deviceId, autoStart: true }]);
     },
     [cameras, removeCamera],
   );
@@ -820,7 +823,7 @@ function Footer({ onBack }: { onBack: () => void }) {
         </div>
       </div>
       <p className="mt-3 text-xs leading-relaxed text-muted">
-        Next: a shareable link that runs this detector on any device.
+        Everything here runs in this tab. Keep it open, and in front, while it watches.
       </p>
     </div>
   );
