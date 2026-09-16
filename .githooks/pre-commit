@@ -1,0 +1,20 @@
+#!/bin/sh
+# Blocks committing a real value in .env.example.
+#
+# That file is tracked in a public repo and exists to document variable NAMES.
+# Pasting a key into it instead of .env.local has happened more than once, and
+# the gap between doing it and pushing is a single command.
+staged=$(git diff --cached --name-only | grep -x '.env.example' || true)
+[ -z "$staged" ] && exit 0
+
+offending=$(git show :.env.example | grep -nE '^[A-Za-z_][A-Za-z0-9_]*=.+' || true)
+if [ -n "$offending" ]; then
+  echo "BLOCKED: .env.example has non-empty values, and it is committed to a public repo."
+  echo
+  echo "$offending" | sed 's/=.*/=<value removed from this message>/'
+  echo
+  echo "Put the value in .env.local (gitignored) instead, and leave the name bare here."
+  echo "If a value here really is safe to publish, commit with --no-verify."
+  exit 1
+fi
+exit 0

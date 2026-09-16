@@ -405,10 +405,14 @@ export default function TriggersStep({
 
             <div className="mt-5 border-t border-border pt-5">
               <label className="text-xs font-medium text-foreground">Message</label>
-              <input
+              {/* A textarea, because this same field is the body of an email as
+                  well as a line of speech, and drafting a few paragraphs in a
+                  single-line input is miserable. resize-y keeps the drag handle. */}
+              <textarea
                 value={template}
                 onChange={(e) => setTemplate(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-border-strong bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-accent"
+                rows={3}
+                className="mt-1.5 w-full resize-y rounded-xl border border-border-strong bg-background px-3 py-2 text-sm leading-relaxed text-foreground outline-none transition-colors focus:border-accent"
               />
               <dl className="mt-3 space-y-1.5 text-xs">
                 <div className="flex gap-2">

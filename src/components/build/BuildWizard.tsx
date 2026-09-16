@@ -7,13 +7,26 @@ import ReviewStep from "./ReviewStep";
 import TrainStep from "./TrainStep";
 import TriggersStep from "./TriggersStep";
 import { MAX_CLASSES, MIN_CLASSES, type DetectorClass, type ExampleImage } from "./types";
+import DetectorLibrary from "./DetectorLibrary";
 import { disposeHead, type TrainedHead } from "@/lib/trainer";
+import * as store from "@/lib/detectorStore";
 import type { Preset } from "@/lib/presets";
 
 const STEPS = ["Describe", "Examples", "Review & label", "Train", "Triggers", "Deploy"] as const;
 
 /** Built so far. The rest are laid out greyed so the shape of the flow is visible. */
 const LIVE_STEPS = 5;
+
+/** Which detector to reopen on the next visit. */
+const LAST_OPEN_KEY = "lookout.lastDetectorId";
+
+/** Metadata is written this long after the last edit, so typing isn't one write per keystroke. */
+const SAVE_DEBOUNCE_MS = 600;
+
+const BLANK_CLASSES = (): DetectorClass[] => [
+  { id: "class-a", name: "", examples: [] },
+  { id: "class-b", name: "", examples: [] },
+];
 
 export default function BuildWizard() {
   const [step, setStep] = useState(0);
@@ -26,6 +39,8 @@ export default function BuildWizard() {
     { id: "class-b", name: "", examples: [] },
   ]);
   const [activeClassId, setActiveClassId] = useState("class-a");
+  const [detectorId, setDetectorId] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState(0);
   /**
    * The trained model lives here rather than in the training step, because the
    * triggers step needs it and navigating between the two unmounts one of them.
@@ -74,6 +89,39 @@ export default function BuildWizard() {
     };
   }, []);
 
+  /**
+   * Photos are written one record at a time as they arrive, and metadata is
+   * debounced. Rewriting every blob on each keystroke would be the obvious
+   * shape and the wrong one — the photos never change after capture.
+   */
+  const saveTimerRef = useRef<number | null>(null);
+  const stateRef = useRef({ description, presetId, classes, detectorId });
+  useEffect(() => {
+    stateRef.current = { description, presetId, classes, detectorId };
+  });
+
+  const persistMeta = useCallback(async () => {
+    const { description: name, presetId: preset, classes: cls, detectorId: id } = stateRef.current;
+    if (!id) return;
+    const existing = await store.getDetector(id);
+    await store.saveDetector({
+      id,
+      name,
+      presetId: preset,
+      classes: cls.map((c) => ({ id: c.id, name: c.name })),
+      createdAt: existing?.createdAt ?? Date.now(),
+      updatedAt: Date.now(),
+      exampleCount: cls.reduce((n, c) => n + c.examples.length, 0),
+      hasModel: existing?.hasModel ?? false,
+    });
+    setSavedAt(Date.now());
+  }, []);
+
+  const scheduleSave = useCallback(() => {
+    if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = window.setTimeout(() => void persistMeta(), SAVE_DEBOUNCE_MS);
+  }, [persistMeta]);
+
   const pickPreset = useCallback(
     (preset: Preset) => {
       setPresetId(preset.id);
@@ -83,19 +131,25 @@ export default function BuildWizard() {
       setClasses((prev) =>
         prev.map((cls, i) => (i < preset.classes.length ? { ...cls, name: preset.classes[i] } : cls)),
       );
+      scheduleSave();
     },
-    [],
+    [scheduleSave],
   );
 
-  const renameClass = useCallback((id: string, name: string) => {
-    setClasses((prev) => prev.map((c) => (c.id === id ? { ...c, name } : c)));
-    setPresetId(null);
-  }, []);
+  const renameClass = useCallback(
+    (id: string, name: string) => {
+      setClasses((prev) => prev.map((c) => (c.id === id ? { ...c, name } : c)));
+      setPresetId(null);
+      scheduleSave();
+    },
+    [scheduleSave],
+  );
 
   const addClass = useCallback(() => {
     const id = newId("class");
     setClasses((prev) => (prev.length >= MAX_CLASSES ? prev : [...prev, { id, name: "", examples: [] }]));
-  }, [newId]);
+    scheduleSave();
+  }, [newId, scheduleSave]);
 
   const removeClass = useCallback(
     (id: string) => {
@@ -107,8 +161,10 @@ export default function BuildWizard() {
         setActiveClassId((current) => (current === id ? next[0].id : current));
         return next;
       });
+      const owner = stateRef.current.detectorId;
+      if (owner) void store.deleteExamplesForClass(owner, id).then(persistMeta);
     },
-    [releaseUrl],
+    [releaseUrl, persistMeta],
   );
 
   const addExamples = useCallback(
@@ -124,8 +180,24 @@ export default function BuildWizard() {
           c.id === activeClassId ? { ...c, examples: [...c.examples, ...created] } : c,
         ),
       );
+
+      const owner = stateRef.current.detectorId;
+      if (owner) {
+        void Promise.all(
+          created.map((example) =>
+            store.putExample({
+              id: example.id,
+              detectorId: owner,
+              classId: activeClassId,
+              blob: example.blob,
+              source: example.source,
+              createdAt: Date.now(),
+            }),
+          ),
+        ).then(persistMeta);
+      }
     },
-    [activeClassId, newId, trackUrl],
+    [activeClassId, newId, trackUrl, persistMeta],
   );
 
   const handleCapture = useCallback((blob: Blob) => addExamples([blob], "camera"), [addExamples]);
@@ -141,8 +213,9 @@ export default function BuildWizard() {
           return { ...c, examples: c.examples.filter((e) => e.id !== exampleId) };
         }),
       );
+      void store.deleteExample(exampleId).then(persistMeta);
     },
-    [releaseUrl],
+    [releaseUrl, persistMeta],
   );
 
   const moveExample = useCallback((fromClassId: string, exampleId: string, toClassId: string) => {
@@ -160,16 +233,102 @@ export default function BuildWizard() {
         return c;
       });
     });
+    void store.moveExample(exampleId, toClassId);
   }, []);
+
+  const loadDetector = useCallback(
+    async (id: string) => {
+      // Everything on screen belongs to the detector being closed: its object
+      // URLs, and a trained model that no longer matches the incoming classes.
+      urlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      urlsRef.current.clear();
+      disposeHead(headRef.current);
+      headRef.current = null;
+      setHead(null);
+
+      const record = await store.getDetector(id);
+      if (!record) return;
+      const examples = await store.listExamples(id);
+
+      setDetectorId(id);
+      window.localStorage.setItem(LAST_OPEN_KEY, id);
+      setDescription(record.name);
+      setPresetId(record.presetId);
+      setClasses(
+        record.classes.map((cls) => ({
+          id: cls.id,
+          name: cls.name,
+          examples: examples
+            .filter((e) => e.classId === cls.id)
+            .sort((a, b) => a.createdAt - b.createdAt)
+            .map((e) => ({ id: e.id, url: trackUrl(e.blob), blob: e.blob, source: e.source })),
+        })),
+      );
+      setActiveClassId(record.classes[0]?.id ?? "class-a");
+      setStep(0);
+      setSavedAt(Date.now());
+    },
+    [trackUrl],
+  );
+
+  const createDetector = useCallback(() => {
+    urlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    urlsRef.current.clear();
+    disposeHead(headRef.current);
+    headRef.current = null;
+    setHead(null);
+
+    const id = `det-${Date.now().toString(36)}`;
+    setDetectorId(id);
+    window.localStorage.setItem(LAST_OPEN_KEY, id);
+    setDescription("");
+    setPresetId(null);
+    setClasses(BLANK_CLASSES());
+    setActiveClassId("class-a");
+    setStep(0);
+    setSavedAt(Date.now());
+  }, []);
+
+  /**
+   * On first paint: reopen the detector that was last open, or mint a new id.
+   *
+   * `loadDetector` and `createDetector` only close over stable callbacks and
+   * setters, so their identities never change and this runs exactly once.
+   */
+  useEffect(() => {
+    if (!store.storageSupported()) return;
+    let cancelled = false;
+    (async () => {
+      const lastId = window.localStorage.getItem(LAST_OPEN_KEY);
+      const existing = lastId ? await store.getDetector(lastId) : undefined;
+      if (cancelled) return;
+      if (existing) await loadDetector(existing.id);
+      else createDetector();
+    })().catch(() => {
+      /* a failed reopen just leaves the blank draft in place */
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [loadDetector, createDetector]);
 
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-12 sm:py-16">
-      <header className="mb-10">
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Build a detector</h1>
-        <p className="mt-3 max-w-2xl text-muted">
-          Describe what you want it to catch, show it a handful of examples, and it trains itself
-          right here in your browser.
-        </p>
+      <header className="mb-10 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Build a detector</h1>
+          <p className="mt-3 max-w-2xl text-muted">
+            Describe what you want it to catch, show it a handful of examples, and it trains itself
+            right here in your browser.
+          </p>
+        </div>
+        <DetectorLibrary
+          currentId={detectorId}
+          currentName={description || "Untitled detector"}
+          savedAt={savedAt}
+          onOpen={(id) => void loadDetector(id)}
+          onCreate={createDetector}
+        />
       </header>
 
       <ol className="mb-10 flex flex-wrap items-center gap-x-2 gap-y-2 text-xs">
@@ -202,6 +361,7 @@ export default function BuildWizard() {
           onDescriptionChange={(value) => {
             setDescription(value);
             setPresetId(null);
+            scheduleSave();
           }}
           presetId={presetId}
           onPickPreset={pickPreset}
@@ -249,11 +409,10 @@ export default function BuildWizard() {
         />
       )}
 
-      {/* Persistence is Phase G. Saying so here beats letting someone lose
-          forty photos to a refresh and assume it's a bug. */}
       <p className="mt-12 border-t border-border pt-6 text-xs text-muted">
-        Work in progress: this draft lives in this browser tab only, so a refresh clears it.
-        Accounts and saved detectors come later in the build.
+        {store.storageSupported()
+          ? "Saved in this browser as you go, so a refresh keeps your photos. Accounts and syncing across devices come later — for now it lives on this machine only."
+          : "This browser can't store data locally, so this draft will be lost on refresh."}
       </p>
     </div>
   );
