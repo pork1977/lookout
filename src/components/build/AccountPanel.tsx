@@ -169,6 +169,10 @@ export default function AccountPanel({
                   Create account
                 </button>
               </div>
+              <p className="mt-3 text-xs leading-relaxed text-muted">
+                New accounts get a confirmation email. If it hasn&apos;t arrived in a minute, check
+                your spam folder — it often lands there.
+              </p>
             </>
           ) : (
             <>

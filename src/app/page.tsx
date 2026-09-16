@@ -1,3 +1,4 @@
+import AuthHashCatcher from "@/components/AuthHashCatcher";
 import Header from "@/components/Header";
 import Hero from "@/components/Hero";
 import HowItWorks from "@/components/HowItWorks";
@@ -8,6 +9,9 @@ import Footer from "@/components/Footer";
 export default function Home() {
   return (
     <div id="top" className="flex flex-1 flex-col bg-background">
+      {/* Deliberately here and not in the layout: /auth/callback shares the
+          layout and would bounce to itself. */}
+      <AuthHashCatcher />
       <Header />
       <main className="flex-1">
         <Hero />
