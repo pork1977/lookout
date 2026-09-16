@@ -36,6 +36,7 @@ export default function AccountPanel({
   const [localIds, setLocalIds] = useState<Set<string>>(new Set());
   const [localCounts, setLocalCounts] = useState<Record<string, number>>({});
   const [confirmRestore, setConfirmRestore] = useState<CloudDetector | null>(null);
+  const [confirmBackup, setConfirmBackup] = useState<CloudDetector | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -71,6 +72,13 @@ export default function AccountPanel({
   }, [user, refreshCloud]);
 
   const missingHere = cloud.filter((item) => !localIds.has(item.localId)).length;
+
+  const runBackup = () =>
+    withBusy("Backup", async () => {
+      await backupDetector(currentDetectorId as string, setProgress);
+      setMessage("Backed up.");
+      refreshCloud();
+    });
 
   useEffect(() => {
     if (open && user) refreshCloud();
@@ -227,13 +235,18 @@ export default function AccountPanel({
 
               <button
                 disabled={busy || !currentDetectorId}
-                onClick={() =>
-                  withBusy("Backup", async () => {
-                    await backupDetector(currentDetectorId as string, setProgress);
-                    setMessage("Backed up.");
-                    refreshCloud();
-                  })
-                }
+                onClick={() => {
+                  const existing = cloud.find((c) => c.localId === currentDetectorId);
+                  const localCount = localCounts[currentDetectorId ?? ""] ?? 0;
+                  // Backing up overwrites the copy in the account, so pushing a
+                  // thinner local detector over a fuller backup destroys the
+                  // difference. Same comparison as restore, other direction.
+                  if (existing && existing.exampleCount > localCount) {
+                    setConfirmBackup(existing);
+                    return;
+                  }
+                  void runBackup();
+                }}
                 className="mt-4 w-full rounded-full px-4 py-2 text-xs font-semibold text-accent-ink transition-transform hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
                 style={{
                   backgroundImage: "linear-gradient(135deg, var(--accent), var(--accent-strong))",
@@ -241,6 +254,38 @@ export default function AccountPanel({
               >
                 Back up the open detector
               </button>
+
+              {confirmBackup && (
+                <div className="mt-3 rounded-xl border border-border-strong p-2.5">
+                  <p className="text-[11px] leading-relaxed text-foreground">
+                    The backup of &ldquo;{confirmBackup.name || "Untitled detector"}&rdquo; has{" "}
+                    {confirmBackup.exampleCount} photos, but this browser only has{" "}
+                    {localCounts[currentDetectorId ?? ""] ?? 0}.
+                  </p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted">
+                    Backing up replaces what is in your account, so the extra photos there would be
+                    lost. Bring the backup here first if you want to keep them.
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      onClick={() => setConfirmBackup(null)}
+                      className="flex-1 rounded-full border border-border-strong px-3 py-1.5 text-[11px] font-medium text-foreground hover:bg-surface-raised"
+                    >
+                      Leave the backup alone
+                    </button>
+                    <button
+                      onClick={() => {
+                        setConfirmBackup(null);
+                        void runBackup();
+                      }}
+                      className="flex-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold"
+                      style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
+                    >
+                      Overwrite anyway
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {progress && (
                 <div className="mt-3">
