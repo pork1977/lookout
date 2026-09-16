@@ -7,6 +7,7 @@ import ReviewStep from "./ReviewStep";
 import TrainStep from "./TrainStep";
 import TriggersStep from "./TriggersStep";
 import { MAX_CLASSES, MIN_CLASSES, type DetectorClass, type ExampleImage } from "./types";
+import AccountPanel from "./AccountPanel";
 import DetectorLibrary from "./DetectorLibrary";
 import { disposeHead, type TrainedHead } from "@/lib/trainer";
 import * as store from "@/lib/detectorStore";
@@ -41,6 +42,7 @@ export default function BuildWizard() {
   const [activeClassId, setActiveClassId] = useState("class-a");
   const [detectorId, setDetectorId] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState(0);
+  const [storageBlocked, setStorageBlocked] = useState(false);
   /**
    * The trained model lives here rather than in the training step, because the
    * triggers step needs it and navigating between the two unmounts one of them.
@@ -296,7 +298,13 @@ export default function BuildWizard() {
    * setters, so their identities never change and this runs exactly once.
    */
   useEffect(() => {
-    if (!store.storageSupported()) return;
+    if (!store.storageSupported()) {
+      // Only reachable in a browser with IndexedDB disabled, and there is no
+      // value to read for this during SSR.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setStorageBlocked(true);
+      return;
+    }
     let cancelled = false;
     (async () => {
       const lastId = window.localStorage.getItem(LAST_OPEN_KEY);
@@ -322,13 +330,19 @@ export default function BuildWizard() {
             right here in your browser.
           </p>
         </div>
-        <DetectorLibrary
-          currentId={detectorId}
-          currentName={description || "Untitled detector"}
-          savedAt={savedAt}
-          onOpen={(id) => void loadDetector(id)}
-          onCreate={createDetector}
-        />
+        <div className="flex items-center gap-2">
+          <AccountPanel
+            currentDetectorId={detectorId}
+            onRestored={(id) => void loadDetector(id)}
+          />
+          <DetectorLibrary
+            currentId={detectorId}
+            currentName={description || "Untitled detector"}
+            savedAt={savedAt}
+            onOpen={(id) => void loadDetector(id)}
+            onCreate={createDetector}
+          />
+        </div>
       </header>
 
       <ol className="mb-10 flex flex-wrap items-center gap-x-2 gap-y-2 text-xs">
@@ -409,11 +423,20 @@ export default function BuildWizard() {
         />
       )}
 
-      <p className="mt-12 border-t border-border pt-6 text-xs text-muted">
-        {store.storageSupported()
-          ? "Saved in this browser as you go, so a refresh keeps your photos. Accounts and syncing across devices come later — for now it lives on this machine only."
-          : "This browser can't store data locally, so this draft will be lost on refresh."}
-      </p>
+      {/* The base sentence is identical on the server and in the browser on
+          purpose. Branching on indexedDB here rendered different text in each
+          and broke hydration — the warning is added after mount instead. */}
+      <div className="mt-12 space-y-1 border-t border-border pt-6 text-xs text-muted">
+        <p>
+          Saved in this browser as you go, so a refresh keeps your photos. An account is optional
+          and only adds backup across machines.
+        </p>
+        {storageBlocked && (
+          <p className="text-foreground">
+            This browser is blocking local storage, so this draft will be lost on refresh.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
