@@ -118,7 +118,7 @@ export default function DetectorLibrary({
                   </div>
 
                   {/* Deleting takes photos the user spent real time capturing,
-                      so it asks — inline, rather than a dialog that steals focus. */}
+                      so it asks, inline, rather than a dialog that steals focus. */}
                   {confirming && (
                     <div className="flex items-center justify-between gap-2 px-2 pb-2">
                       <span className="text-[11px] text-muted">Delete this and its photos?</span>

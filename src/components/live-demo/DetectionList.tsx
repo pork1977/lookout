@@ -7,7 +7,7 @@ import type { DetectionGroup, TrackedDetection } from "./types";
  * The list is deliberately append-only. A row appears the first time its object
  * is seen and then stays for the rest of the session, fading heavily when the
  * object leaves frame and coming back when it returns. Rows are also never
- * reordered — sinking inactive ones to the bottom would reintroduce exactly the
+ * reordered, sinking inactive ones to the bottom would reintroduce exactly the
  * motion this is meant to remove.
  */
 export default function DetectionList({
@@ -32,7 +32,7 @@ export default function DetectionList({
         className="min-h-0 flex-1 overflow-y-auto p-2"
         // Without a stable gutter, the scrollbar appearing as rows accumulate
         // narrows this column, which widens the camera beside it, which changes
-        // its aspect-driven height — a visible feedback loop, not a one-off nudge.
+        // its aspect-driven height, a visible feedback loop, not a one-off nudge.
         style={{ scrollbarGutter: "stable" }}
       >
         {all.length === 0 && (
@@ -97,7 +97,7 @@ function Row({ d, color }: { d: TrackedDetection; color: string }) {
       style={{
         opacity: d.active ? 1 : 0.22,
         // Draining the color as well as the opacity is what keeps a
-        // no-longer-visible object from competing for attention — a plain grey
+        // no-longer-visible object from competing for attention, a plain grey
         // at this size still reads as "something to look at".
         filter: d.active ? "none" : "grayscale(1)",
         transition: "opacity 160ms ease, filter 160ms ease",

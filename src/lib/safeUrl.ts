@@ -6,8 +6,8 @@ import { lookup } from "node:dns/promises";
  * at http://169.254.169.254/ and have our server fetch cloud credentials for
  * them, or sweep a private network from inside it.
  *
- * Hostname checks alone are not enough — a name under an attacker's control can
- * resolve straight to 127.0.0.1 — so the resolved addresses are what get
+ * Hostname checks alone are not enough, a name under an attacker's control can
+ * resolve straight to 127.0.0.1, so the resolved addresses are what get
  * checked, and every address must pass.
  */
 
@@ -35,7 +35,7 @@ function isBlockedIPv6(ip: string): boolean {
   if (lower === "::" || lower === "::1") return true; // unspecified, loopback
   if (lower.startsWith("fe80")) return true; // link-local
   if (/^f[cd]/.test(lower)) return true; // unique local
-  // ::ffff:a.b.c.d — an IPv4 address wearing an IPv6 hat, still needs the v4 rules.
+  // ::ffff:a.b.c.d, an IPv4 address wearing an IPv6 hat, still needs the v4 rules.
   const mapped = lower.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
   if (mapped) return isBlockedIPv4(mapped[1]);
   return false;
@@ -54,7 +54,7 @@ export async function checkOutboundUrl(raw: string): Promise<UrlCheck> {
     return { ok: false, reason: "That doesn't look like a valid URL." };
   }
 
-  // http:// would send the URL — and anything in it — in clear text, and is
+  // http:// would send the URL, and anything in it, in clear text, and is
   // almost always a sign of an internal address.
   if (url.protocol !== "https:") {
     return { ok: false, reason: "Webhook URLs must start with https://" };
@@ -86,5 +86,5 @@ export async function checkOutboundUrl(raw: string): Promise<UrlCheck> {
   return { ok: true };
 }
 
-/** Exported for tests — the address rules are the part worth exercising directly. */
+/** Exported for tests, the address rules are the part worth exercising directly. */
 export const __test = { isBlockedIPv4, isBlockedIPv6 };

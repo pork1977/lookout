@@ -28,7 +28,7 @@ export function useMediaDevices() {
   useEffect(() => {
     // Enumerating devices is an inherently async browser API with no
     // synchronous snapshot to subscribe to (unlike the theme attribute),
-    // so this effect's job really is "fetch on mount, then resubscribe" —
+    // so this effect's job really is "fetch on mount, then resubscribe"
     // the one legitimate case react-hooks/set-state-in-effect can't model.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();

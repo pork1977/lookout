@@ -5,8 +5,8 @@ import { useEffect } from "react";
 /**
  * Safety net for auth links that land on the site root.
  *
- * When Supabase can't honour the redirect an app asks for — the URL isn't on
- * the allow list, or the list and the code have drifted apart — it falls back
+ * When Supabase can't honour the redirect an app asks for, the URL isn't on
+ * the allow list, or the list and the code have drifted apart, it falls back
  * to the project's Site URL, which is normally the site root. That arrives with
  * a session sitting in the fragment on a page that isn't looking for one, and
  * the sign-up dead-ends with tokens in the address bar.

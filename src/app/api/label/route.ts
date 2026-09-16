@@ -112,8 +112,8 @@ function validate(body: LabelRequestBody): string | null {
 
 async function labelBatch(client: Anthropic, body: LabelRequestBody): Promise<LabelResult[]> {
   // Stable synthetic labels rather than the user's own group names. Names are
-  // free text — they can collide when cased differently, contain emoji, or be
-  // renamed mid-run — and none of that should reach the model as an identifier.
+  // free text, they can collide when cased differently, contain emoji, or be
+  // renamed mid-run, and none of that should reach the model as an identifier.
   const slugs = body.classes.map((_, i) => `group_${i + 1}`);
   const slugToClassId = new Map(slugs.map((slug, i) => [slug, body.classes[i].id]));
   // `slugs` always has at least two entries (validate() enforces two groups),
@@ -133,7 +133,7 @@ async function labelBatch(client: Anthropic, body: LabelRequestBody): Promise<La
     ),
   });
 
-  const roster = body.classes.map((c, i) => `- ${slugs[i]} — "${c.name}"`).join("\n");
+  const roster = body.classes.map((c, i) => `- ${slugs[i]}, "${c.name}"`).join("\n");
   const system = [
     "You are helping someone sort photos they captured to train a small custom image detector.",
     "",
@@ -141,7 +141,7 @@ async function labelBatch(client: Anthropic, body: LabelRequestBody): Promise<La
     "",
     "The groups, and the label to use for each:",
     roster,
-    `- ${UNCLEAR_LABEL} — the photo is blurry, empty, ambiguous, or fits none of the groups`,
+    `- ${UNCLEAR_LABEL}, the photo is blurry, empty, ambiguous, or fits none of the groups`,
     "",
     "For every image you are shown, return one entry with that image's number, the label of",
     "the group it belongs in, your own 0-1 confidence, and a note of at most 12 words saying",

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CameraDevice } from "@/lib/useMediaDevices";
 
 /**
- * Rendered in two places at once — above the inline camera and inside the
+ * Rendered in two places at once, above the inline camera and inside the
  * expanded overlay. Only `open` is local to each copy; every piece of state
  * that has to agree between them (which cameras are active, whether compare
  * mode is on) lives in the parent, so changing the camera in one place is

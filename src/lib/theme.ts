@@ -1,7 +1,7 @@
 /**
  * One theming system, not several. Every theme (including Light and Dark)
- * is the same generator — base hue + saturation "temperature" (bgSat) + mode
- * — fed different parameters. A neutral theme is just a colored theme with
+ * is the same generator, base hue + saturation "temperature" (bgSat) + mode
+ *, fed different parameters. A neutral theme is just a colored theme with
  * bgSat turned way down; Blue is the same formula with bgSat turned up.
  * The concrete values this produces live in globals.css under
  * `[data-theme="..."]`, generated with this exact formula so the numbers

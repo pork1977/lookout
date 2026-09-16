@@ -10,7 +10,7 @@ const LIGHT_INK = "#ffffff";
  * Picks readable text to sit on top of `color`.
  *
  * Tile colors come from CSS custom properties, so they arrive as whatever
- * syntax the active theme happens to use — `hsl(150 70% 62%)`, a hex string,
+ * syntax the active theme happens to use, `hsl(150 70% 62%)`, a hex string,
  * possibly `oklch()` later. Rather than hand-parsing that, this pushes the
  * color through a 1x1 canvas and reads the rasterized pixel back, which uses
  * the browser's own color parser and handles every syntax it supports.
@@ -30,7 +30,7 @@ export function inkFor(color: string): string {
   if (!probe) return DARK_INK;
 
   // An unparseable value leaves fillStyle untouched, so seed a known one
-  // first — that way a failure falls back to white ink rather than to
+  // first, that way a failure falls back to white ink rather than to
   // whichever color happened to be measured last.
   probe.fillStyle = "#000000";
   probe.fillStyle = color;

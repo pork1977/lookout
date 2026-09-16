@@ -146,8 +146,8 @@ export default function TriggersStep({
   );
 
   // The prediction loop calls fireRef.current, never `fire` directly, so `fire`
-  // is free to be rebuilt whenever its inputs change — including the voice
-  // settings — without disturbing the loop or the dwell clock.
+  // is free to be rebuilt whenever its inputs change, including the voice
+  // settings, without disturbing the loop or the dwell clock.
   const fireRef = useRef(fire);
   useEffect(() => {
     fireRef.current = fire;
@@ -191,7 +191,7 @@ export default function TriggersStep({
         drawFrameForInference(video, canvas);
         const scores = await predict(head, await embedCanvas(canvas));
         if (cancelled) return;
-        // One camera here — the same engine takes a reading per camera once a
+        // One camera here, the same engine takes a reading per camera once a
         // detector can watch several at once.
         const state = engine.update([{ cameraId: "primary", score: scores[classIndex] }], Date.now());
         setEngineState({ held: state.heldMs, condition: state.condition, cooling: state.cooling });
@@ -316,8 +316,8 @@ export default function TriggersStep({
               </div>
               <p className="mt-2 text-xs leading-relaxed text-muted">
                 {rule.combine === "any"
-                  ? "Right for “something is there”, and for cameras watching different places — a camera that can't see the dog isn't evidence there's no dog."
-                  : "Right for “nothing is there”, like “I've left my desk” — one camera still seeing you proves the condition false. Cameras that can only half-see abstain rather than blocking."}
+                  ? "Right for “something is there”, and for cameras watching different places, a camera that can't see the dog isn't evidence there's no dog."
+                  : "Right for “nothing is there”, like “I've left my desk”, one camera still seeing you proves the condition false. Cameras that can only half-see abstain rather than blocking."}
               </p>
             </div>
           </section>
@@ -340,7 +340,7 @@ export default function TriggersStep({
                         // Captured before the await: this is a controlled input,
                         // so React repaints it back to its state value while the
                         // permission prompt is open, and reading e.target.checked
-                        // afterwards always came back false — which is why the
+                        // afterwards always came back false, which is why the
                         // box never stayed ticked.
                         const wanted = e.target.checked;
                         if (wanted && action.id === "notify") {
@@ -422,7 +422,7 @@ export default function TriggersStep({
                     </code>
                   </dt>
                   <dd className="text-muted">
-                    the group it saw &mdash; right now that is{" "}
+                    the group it saw, right now that is{" "}
                     <span className="text-foreground">
                       &ldquo;{activeClassName}&rdquo;
                     </span>
@@ -435,7 +435,7 @@ export default function TriggersStep({
                     </code>
                   </dt>
                   <dd className="text-muted">
-                    how sure it was, as a percentage &mdash;{" "}
+                    how sure it was, as a percentage,{" "}
                     <span className="text-foreground">&ldquo;92%&rdquo;</span>
                   </dd>
                 </div>
@@ -448,7 +448,7 @@ export default function TriggersStep({
                 <span className="text-foreground">&ldquo;{previewMessage}&rdquo;</span>
               </p>
               <p className="mt-1.5 text-xs text-muted">
-                The round brackets are ordinary text &mdash; delete them if you would rather it
+                The round brackets are ordinary text, delete them if you would rather it
                 just said &ldquo;{activeClassName} 92%&rdquo;.
               </p>
             </div>
@@ -555,9 +555,9 @@ export default function TriggersStep({
                 {!armed
                   ? "Set your conditions, then start watching."
                   : engineState?.cooling
-                    ? "Just fired — holding off for the cooldown."
+                    ? "Just fired, holding off for the cooldown."
                     : engineState?.condition
-                      ? `Holding — ${(engineState.held / 1000).toFixed(1)}s of ${rule.dwellSeconds}s`
+                      ? `Holding, ${(engineState.held / 1000).toFixed(1)}s of ${rule.dwellSeconds}s`
                       : "Waiting to see it."}
               </p>
             </div>

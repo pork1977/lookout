@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import AuthCallback from "@/components/AuthCallback";
 
 export const metadata: Metadata = {
-  title: "Confirming your account — Lookout",
+  title: "Confirming your account | Lookout",
   robots: { index: false, follow: false },
 };
 

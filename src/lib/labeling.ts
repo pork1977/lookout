@@ -1,6 +1,6 @@
 /**
  * Shared contract between the labelling UI and the /api/label route.
- * No server-only imports here — the client imports this too.
+ * No server-only imports here, the client imports this too.
  */
 
 /** Server-side ceiling per request. Keeps one call well inside token and body limits. */

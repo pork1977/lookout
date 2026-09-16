@@ -4,7 +4,7 @@ import { getSupabase } from "./supabaseClient";
 import * as store from "./detectorStore";
 
 /**
- * Backup and restore, deliberately — not two-way sync.
+ * Backup and restore, deliberately, not two-way sync.
  *
  * Real sync needs conflict resolution: the same detector edited on a laptop and
  * a phone, offline, is a merge problem with no obviously right answer, and
@@ -195,4 +195,33 @@ export async function deleteCloudDetector(cloudId: string): Promise<void> {
   if (paths.length) await supabase.storage.from(BUCKET).remove(paths);
   const { error } = await supabase.from("detectors").delete().eq("id", cloudId);
   if (error) throw new Error(error.message);
+}
+
+/**
+ * Removes everything this account holds on the server, then the account itself.
+ *
+ * Storage first, while the session is still valid to authorise it: object
+ * removal is not covered by the row cascade, and once auth.users is gone there
+ * is no longer a caller allowed to touch those files. Local detectors in
+ * IndexedDB are deliberately untouched, since they were never the account's to
+ * begin with and the person may well still want them.
+ */
+export async function deleteAccount(): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) throw new Error("Accounts aren't configured on this deployment.");
+
+  const { data: auth } = await supabase.auth.getUser();
+  const userId = auth.user?.id;
+  if (!userId) throw new Error("You need to be signed in.");
+
+  const { data: rows } = await supabase.from("examples").select("storage_path");
+  const paths = (rows ?? []).map((r) => r.storage_path as string);
+  if (paths.length) await supabase.storage.from(BUCKET).remove(paths);
+
+  // A security-definer function rather than the admin API, so no service_role
+  // key has to exist anywhere the browser can reach.
+  const { error } = await supabase.rpc("delete_own_account");
+  if (error) throw new Error(error.message);
+
+  await supabase.auth.signOut();
 }

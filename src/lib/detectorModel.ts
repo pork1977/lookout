@@ -1,7 +1,7 @@
 import type { DetectedObject } from "@tensorflow-models/coco-ssd";
 import type { ObjectDetection } from "@tensorflow-models/coco-ssd";
 
-/** Upper bound on boxes per frame — matches coco-ssd's own default. */
+/** Upper bound on boxes per frame, matches coco-ssd's own default. */
 const MAX_BOXES = 20;
 
 /**
@@ -92,7 +92,7 @@ export function detect(video: HTMLVideoElement): Promise<DetectedObject[]> {
     return model.detect(video, MAX_BOXES, KEEP_SCORE);
   });
   // The queue must survive a rejected call, or every later tile deadlocks
-  // behind it — so the tail tracks a swallowed copy, not `run` itself.
+  // behind it, so the tail tracks a swallowed copy, not `run` itself.
   tail = run.catch(() => undefined);
   return run;
 }

@@ -106,7 +106,7 @@ export default function ExamplesStep({
               </>
             ) : (
               <>
-                Next, Claude looks at each photo and says which group it belongs in — you only
+                Next, Claude looks at each photo and says which group it belongs in, so you only
                 review the ones it isn&apos;t sure about.
               </>
             )}
@@ -151,7 +151,7 @@ function ClassBucket({
               : count < MIN_PER_CLASS
                 ? `${count} of ${MIN_PER_CLASS} minimum`
                 : count < RECOMMENDED_PER_CLASS
-                  ? `${count} photos — ${RECOMMENDED_PER_CLASS} makes it noticeably steadier`
+                  ? `${count} photos. ${RECOMMENDED_PER_CLASS} makes it noticeably steadier`
                   : `${count} photos`}
           </p>
         </div>
@@ -265,7 +265,7 @@ function Thumbnail({
 /**
  * Replaces a native <select>.
  *
- * The browser draws an option list as its own widget, outside the DOM — its
+ * The browser draws an option list as its own widget, outside the DOM, its
  * padding can't be set reliably and its layout can't even be measured, so
  * "give the text room on the right" isn't something CSS can promise there.
  * This is the same button-plus-panel pattern the camera picker uses, which

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Every example — webcam frame or uploaded file — is normalised to one square
+ * Every example, webcam frame or uploaded file, is normalised to one square
  * JPEG at this size. A uniform set is what lets Phase E feed the model without
  * per-image special cases, and 320px keeps a few hundred photos comfortably in
  * memory while leaving headroom above MobileNet's 224px input.
@@ -23,8 +23,8 @@ const MIRROR_CAMERA_FRAMES = true;
  * Draws a source into `canvas` as the one canonical example image: square,
  * centre-cropped, EXAMPLE_SIZE on a side, mirrored if asked.
  *
- * Every path that turns pixels into model input goes through this — capture at
- * build time and the live camera at inference time — so the two cannot drift
+ * Every path that turns pixels into model input goes through this, capture at
+ * build time and the live camera at inference time, so the two cannot drift
  * apart. They must not: a model trained on mirrored frames and run on
  * unmirrored ones just quietly underperforms, with nothing to point at.
  */
@@ -88,7 +88,7 @@ export function frameToBlob(video: HTMLVideoElement): Promise<Blob> {
 }
 
 /**
- * Uploaded photos are not mirrored — they were taken by a real camera facing
+ * Uploaded photos are not mirrored, they were taken by a real camera facing
  * the right way, so flipping them would be the inconsistency, not the fix.
  */
 export async function fileToBlob(file: File): Promise<Blob> {

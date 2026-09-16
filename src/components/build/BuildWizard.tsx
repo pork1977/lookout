@@ -94,7 +94,7 @@ export default function BuildWizard() {
   /**
    * Photos are written one record at a time as they arrive, and metadata is
    * debounced. Rewriting every blob on each keystroke would be the obvious
-   * shape and the wrong one — the photos never change after capture.
+   * shape and the wrong one, the photos never change after capture.
    */
   const saveTimerRef = useRef<number | null>(null);
   const stateRef = useRef({ description, presetId, classes, detectorId });
@@ -353,7 +353,7 @@ export default function BuildWizard() {
           return (
             <li key={name} className="flex items-center gap-2">
               {/* Jumping straight to a step is allowed even when it can't do
-                  anything yet — every step already explains what it's waiting
+                  anything yet, every step already explains what it's waiting
                   for, which is more useful than a control that ignores a click. */}
               <button
                 onClick={() => setStep(i)}
@@ -432,7 +432,7 @@ export default function BuildWizard() {
 
       {/* The base sentence is identical on the server and in the browser on
           purpose. Branching on indexedDB here rendered different text in each
-          and broke hydration — the warning is added after mount instead. */}
+          and broke hydration, the warning is added after mount instead. */}
       <div className="mt-12 space-y-1 border-t border-border pt-6 text-xs text-muted">
         <p>
           Saved in this browser as you go, so a refresh keeps your photos. An account is optional

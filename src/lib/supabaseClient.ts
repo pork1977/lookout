@@ -6,7 +6,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
  * Returns a browser Supabase client, or null when the project isn't configured.
  *
  * Null is a supported state, not an error: the whole app works without an
- * account — detectors live in IndexedDB — and accounts only add backup and
+ * account, detectors live in IndexedDB, and accounts only add backup and
  * restore. Every caller is expected to handle null and say so in the UI, the
  * same way the labelling step does without an Anthropic key.
  *

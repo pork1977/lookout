@@ -4,7 +4,7 @@
  * Resolution rungs tried in order when a camera won't open.
  *
  * Several USB webcams on one controller can exceed the bus's bandwidth, and the
- * third one to start then fails outright — a resource problem, not a permission
+ * third one to start then fails outright, a resource problem, not a permission
  * problem, and dropping the resolution is the standard way out of it.
  * `deviceId: { exact }` is re-applied on every rung on purpose: relaxing it
  * would let the browser quietly hand back a *different* camera, and the caller

@@ -19,8 +19,8 @@ type TileStatus =
 
 /**
  * Floor on the gap between detections. Running detect() as fast as
- * requestAnimationFrame allows pins the GPU for no visible benefit — the boxes
- * already move faster than the eye reads them — and with three cameras sharing
+ * requestAnimationFrame allows pins the GPU for no visible benefit, the boxes
+ * already move faster than the eye reads them, and with three cameras sharing
  * one model it was a direct cause of stutter.
  */
 const DETECT_INTERVAL_MS = 70;
@@ -80,7 +80,7 @@ function CameraTile({
   const hasStartedOnceRef = useRef(false);
 
   // Values the draw loop reads every frame. Held in refs so the loop's own
-  // identity stays stable — recreating it would restart detection whenever the
+  // identity stays stable, recreating it would restart detection whenever the
   // theme color or the expanded state changed.
   const compactRef = useRef(compact);
   const colorRef = useRef(color);
@@ -88,7 +88,7 @@ function CameraTile({
 
   /**
    * Everything this camera has seen this session. Entries are added once and
-   * then only toggle active/inactive — they are never removed, which is what
+   * then only toggle active/inactive, they are never removed, which is what
    * stops rows appearing and vanishing as detection wobbles.
    */
   const registryRef = useRef<Map<string, RegistryEntry>>(new Map());
@@ -108,7 +108,7 @@ function CameraTile({
   const [quality, setQuality] = useState<"fast" | "accurate">("fast");
   /**
    * `autoStart` means "start on mount", and it was also standing in for "this
-   * tile is never started by hand" — which left a stopped grid camera with no
+   * tile is never started by hand", which left a stopped grid camera with no
    * way back, showing "waiting for permission" forever. This splits the two.
    */
   const [everStarted, setEverStarted] = useState(false);
@@ -133,7 +133,7 @@ function CameraTile({
 
   // Going into grid mode means more cameras are competing for the same USB
   // bandwidth, so the already-running tile gives some back rather than holding
-  // the full-size stream it opened with. A rejection here is fine — the stream
+  // the full-size stream it opened with. A rejection here is fine, the stream
   // simply keeps its current resolution.
   useEffect(() => {
     if (!compact) return;
@@ -287,7 +287,7 @@ function CameraTile({
 
         const [rawX, y, w, h] = p.bbox;
         // The video renders mirrored (selfie view) via a CSS flip on the
-        // <video> element only — the canvas itself is NOT flipped, so text
+        // <video> element only, the canvas itself is NOT flipped, so text
         // drawn on it stays readable. Boxes are mirrored manually here to line
         // up with the mirrored video underneath.
         const x = canvas.width - rawX - w;
@@ -545,11 +545,11 @@ function CameraTile({
                 ) : compact ? (
                   // The full explanation doesn't fit a grid tile at a legible
                   // size, so the small view gets the actionable half of it.
-                  <>{cameraLabel} couldn&apos;t start — try stopping one of the other cameras.</>
+                  <>{cameraLabel} couldn&apos;t start, try stopping one of the other cameras.</>
                 ) : (
                   <>
                     {cameraLabel} couldn&apos;t start. It may be in use by another app, or your USB
-                    controller may not have the bandwidth for this many cameras at once — try
+                    controller may not have the bandwidth for this many cameras at once, try
                     stopping one of the others.
                   </>
                 )}

@@ -5,7 +5,7 @@ import type { DispatchAction } from "@/app/api/dispatch/route";
 /**
  * Client-only actions fire with no network hop at all, which is why they're
  * instant and work offline. Everything that has to leave the browser goes
- * through /api/dispatch instead — a webhook URL is effectively a secret and
+ * through /api/dispatch instead, a webhook URL is effectively a secret and
  * has no business sitting in a page.
  */
 
@@ -25,8 +25,8 @@ export function speechSupported(): boolean {
 }
 
 /**
- * The voice list arrives asynchronously in most browsers — calling getVoices()
- * too early returns an empty array — so callers subscribe rather than ask once.
+ * The voice list arrives asynchronously in most browsers, calling getVoices()
+ * too early returns an empty array, so callers subscribe rather than ask once.
  */
 export function subscribeToVoices(onChange: (voices: SpeechSynthesisVoice[]) => void): () => void {
   if (!speechSupported()) return () => {};
@@ -39,7 +39,7 @@ export function subscribeToVoices(onChange: (voices: SpeechSynthesisVoice[]) => 
 /**
  * Picks the best-sounding voice available without any third-party service.
  *
- * The default voice a browser hands you is usually the oldest bundled one —
+ * The default voice a browser hands you is usually the oldest bundled one
  * that's the flat, robotic sound. Modern browsers ship much better ones
  * alongside it; they're just never chosen for you. Preference order is the
  * newer neural/natural voices, then cloud voices (which are near-always better
@@ -125,7 +125,7 @@ export async function dispatch(request: DispatchRequest): Promise<{ ok: boolean;
 }
 
 /**
- * Fills {what} and {confidence} in a user-written message. Deliberately tiny —
+ * Fills {what} and {confidence} in a user-written message. Deliberately tiny
  * this is a message template, not a template language.
  */
 export function renderMessage(template: string, className: string, confidence: number): string {

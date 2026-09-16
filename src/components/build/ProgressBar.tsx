@@ -3,8 +3,8 @@
 /**
  * Shared by the labelling and training steps.
  *
- * `indeterminate` is for phases with nothing honest to count — a model
- * downloading, a request in flight — where a made-up percentage would be worse
+ * `indeterminate` is for phases with nothing honest to count, a model
+ * downloading, a request in flight, where a made-up percentage would be worse
  * than admitting the work isn't measurable yet.
  */
 export default function ProgressBar({
@@ -15,7 +15,7 @@ export default function ProgressBar({
   /** 0 to 1. */
   value?: number;
   indeterminate?: boolean;
-  /** Whether work is still happening — drives the travelling sheen. */
+  /** Whether work is still happening, drives the travelling sheen. */
   active?: boolean;
 }) {
   const pct = Math.max(0, Math.min(1, value)) * 100;

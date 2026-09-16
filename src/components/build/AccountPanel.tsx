@@ -5,6 +5,7 @@ import type { User } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabaseClient";
 import {
   backupDetector,
+  deleteAccount,
   deleteCloudDetector,
   listCloudDetectors,
   restoreDetector,
@@ -29,6 +30,7 @@ export default function AccountPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [cloud, setCloud] = useState<CloudDetector[]>([]);
   const [progress, setProgress] = useState<SyncProgress | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -171,7 +173,7 @@ export default function AccountPanel({
               </div>
               <p className="mt-3 text-xs leading-relaxed text-muted">
                 New accounts get a confirmation email. If it hasn&apos;t arrived in a minute, check
-                your spam folder — it often lands there.
+                your spam folder, as it often lands there.
               </p>
             </>
           ) : (
@@ -262,6 +264,52 @@ export default function AccountPanel({
                   </p>
                 </div>
               )}
+
+              <div className="mt-4 border-t border-border pt-3">
+                {!confirmDelete ? (
+                  <button
+                    disabled={busy}
+                    onClick={() => setConfirmDelete(true)}
+                    className="text-[11px] text-muted underline underline-offset-2 transition-colors hover:text-foreground disabled:opacity-40"
+                  >
+                    Delete my account
+                  </button>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-[11px] leading-relaxed text-foreground">
+                      This removes your account and everything backed up to it, permanently.
+                    </p>
+                    <p className="text-[11px] leading-relaxed text-muted">
+                      Detectors saved in this browser are not touched, so anything open here stays
+                      where it is.
+                    </p>
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        disabled={busy}
+                        onClick={() => setConfirmDelete(false)}
+                        className="flex-1 rounded-full border border-border-strong px-3 py-1.5 text-[11px] font-medium text-foreground hover:bg-surface-raised disabled:opacity-40"
+                      >
+                        Keep my account
+                      </button>
+                      <button
+                        disabled={busy}
+                        onClick={() =>
+                          withBusy("Delete account", async () => {
+                            await deleteAccount();
+                            setConfirmDelete(false);
+                            setCloud([]);
+                            setMessage("Your account and its backups have been deleted.");
+                          })
+                        }
+                        className="flex-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold disabled:opacity-40"
+                        style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
+                      >
+                        Delete permanently
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </>
           )}
 

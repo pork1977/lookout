@@ -18,7 +18,7 @@ import type { DetectorClass } from "./types";
 
 type Phase = "idle" | "loading-model" | "embedding" | "training" | "trained" | "error";
 
-/** Roughly eight predictions a second — smooth to read, cheap to run. */
+/** Roughly eight predictions a second, smooth to read, cheap to run. */
 const PREDICT_INTERVAL_MS = 120;
 
 export default function TrainStep({
@@ -54,7 +54,7 @@ export default function TrainStep({
   const busyRef = useRef(false);
 
   // Embeddings are keyed by example id so a retrain after adding a few photos
-  // only pays for the new ones — the whole point of freezing the extractor.
+  // only pays for the new ones, the whole point of freezing the extractor.
   const embeddingCacheRef = useRef<Map<string, Float32Array>>(new Map());
 
   const stopCamera = useCallback(() => {
@@ -141,8 +141,8 @@ export default function TrainStep({
       if (!video || video.readyState < 2 || busyRef.current) return;
       busyRef.current = true;
       try {
-        // Same transform the training photos were stored with — mirrored and
-        // centre-cropped — which is the whole reason this goes through the
+        // Same transform the training photos were stored with, mirrored and
+        // centre-cropped, which is the whole reason this goes through the
         // shared helper rather than reading the video directly.
         drawFrameForInference(video, canvas);
         const embedding = await embedCanvas(canvas);
@@ -173,7 +173,7 @@ export default function TrainStep({
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
             Your {totalExamples} photos run once through a pretrained vision model to turn each
             into a compact fingerprint, then a small classifier learns to tell your groups apart
-            from those. It all happens in this tab — no upload, no queue, and it takes seconds.
+            from those. It all happens in this tab, with no upload and no queue, and it takes seconds.
           </p>
           <button
             onClick={train}
@@ -189,7 +189,7 @@ export default function TrainStep({
               what's missing than to start and fail on an empty set. */}
           {totalExamples === 0 && (
             <p className="mt-2 text-xs text-muted">
-              No photos yet — add some on the Examples step first.
+              No photos yet. Add some on the Examples step first.
             </p>
           )}
           <p className="mt-3 text-xs text-muted">
@@ -202,10 +202,10 @@ export default function TrainStep({
         <div className="rounded-2xl border border-border bg-surface p-6">
           <p className="text-sm font-medium text-foreground">
             {phase === "loading-model" && "Loading the vision model…"}
-            {phase === "embedding" && `Reading your photos — ${prepared.done} of ${prepared.total}`}
+            {phase === "embedding" && `Reading your photos: ${prepared.done} of ${prepared.total}`}
             {phase === "training" &&
               (epoch
-                ? `Training — pass ${epoch.epoch} of ${epoch.totalEpochs}`
+                ? `Training, pass ${epoch.epoch} of ${epoch.totalEpochs}`
                 : "Training…")}
           </p>
           <div className="mt-3">
@@ -230,11 +230,11 @@ export default function TrainStep({
             </p>
           )}
           {/* TensorFlow.js yields between batches through requestAnimationFrame,
-              which browsers stop delivering to a hidden tab — so training pauses
+              which browsers stop delivering to a hidden tab, so training pauses
               if you switch away, and picks up again when you come back. Saying so
               beats looking frozen. */}
           <p className="mt-2 text-xs text-muted">
-            Keep this tab in front — training pauses if you switch away, and resumes when you
+            Keep this tab in front, training pauses if you switch away, and resumes when you
             come back.
           </p>
         </div>
@@ -260,7 +260,7 @@ export default function TrainStep({
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
               It got {Math.round(head.finalAccuracy * 100)}% right on the photos it learned from.
-              That number always flatters — it&apos;s the real test below that tells you anything.
+              That number always flatters, it&apos;s the real test below that tells you anything.
             </p>
           </div>
 
@@ -302,7 +302,7 @@ export default function TrainStep({
                       <p className="text-sm text-foreground">
                         {cameraState === "denied"
                           ? "Camera access was blocked. Allow it and try again."
-                          : "That camera couldn't start — it may be in use by another app."}
+                          : "That camera couldn't start, it may be in use by another app."}
                       </p>
                       <button
                         onClick={startCamera}
@@ -364,7 +364,7 @@ export default function TrainStep({
               )}
               <p className="mt-5 border-t border-border pt-4 text-xs leading-relaxed text-muted">
                 Weak spot? Go back to Examples, add photos of the case it gets wrong, and train
-                again — the photos it has already seen are cached, so a retrain only pays for the
+                again, the photos it has already seen are cached, so a retrain only pays for the
                 new ones.
               </p>
             </div>
@@ -393,7 +393,7 @@ export default function TrainStep({
         </div>
         <p className="mt-3 text-xs leading-relaxed text-muted">
           {head
-            ? "Next: decide what happens when it sees something — speak, notify, banner, Slack, Discord, webhook or email."
+            ? "Next: decide what happens when it sees something, speak, notify, banner, Slack, Discord, webhook or email."
             : "Train it first, then you can decide what happens when it sees something."}
         </p>
       </div>

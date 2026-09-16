@@ -3,7 +3,7 @@
 /**
  * Local persistence for detectors and their photos.
  *
- * IndexedDB rather than localStorage because it stores Blobs natively — the
+ * IndexedDB rather than localStorage because it stores Blobs natively, the
  * photos stay as JPEGs instead of being base64'd into strings, which would
  * inflate them by a third and force a parse of the whole set on every read.
  *
@@ -25,7 +25,7 @@ export interface DetectorRecord {
   id: string;
   name: string;
   presetId: string | null;
-  /** Names only — the photos live in the examples store, keyed by classId. */
+  /** Names only, the photos live in the examples store, keyed by classId. */
   classes: Array<{ id: string; name: string }>;
   createdAt: number;
   updatedAt: number;
@@ -127,7 +127,7 @@ export async function moveExample(id: string, classId: string): Promise<void> {
     const get = store.get(id);
     get.onsuccess = () => {
       const record = get.result as ExampleRecord | undefined;
-      // Gone already is not an error — the photo may have been deleted while
+      // Gone already is not an error, the photo may have been deleted while
       // this was queued.
       if (!record) return resolve();
       store.put({ ...record, classId });
@@ -153,7 +153,7 @@ export async function deleteDetector(id: string): Promise<void> {
 
 /**
  * The trained head is saved through TensorFlow.js's own IndexedDB handler
- * rather than as a blob here — it knows how to serialise weights, and reloading
+ * rather than as a blob here, it knows how to serialise weights, and reloading
  * a saved model is what stops a refresh costing another training run.
  */
 export function modelUrl(detectorId: string): string {

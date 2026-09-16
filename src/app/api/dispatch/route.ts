@@ -31,7 +31,7 @@ interface DispatchBody {
  * Which email provider is configured, if any.
  *
  * Two different services with different endpoints, auth headers and body
- * shapes — a Brevo key in RESEND_API_KEY authenticates against nothing, so the
+ * shapes, a Brevo key in RESEND_API_KEY authenticates against nothing, so the
  * variable name is what selects the provider.
  */
 function emailProvider(): "resend" | "brevo" | null {
@@ -196,7 +196,7 @@ async function sendEmail(body: DispatchBody) {
       signal: controller.signal,
     });
     if (!response.ok) {
-      // The provider's own reason is the useful part here — a wrong key or an
+      // The provider's own reason is the useful part here, a wrong key or an
       // unverified sender address both come back as a plain 401/403 otherwise.
       const detail = await response.text().catch(() => "");
       return NextResponse.json(

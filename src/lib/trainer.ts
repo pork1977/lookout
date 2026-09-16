@@ -7,7 +7,7 @@ import type { MobileNet } from "@tensorflow-models/mobilenet";
  * Transfer learning, the Teachable Machine mechanic: a frozen MobileNet turns
  * each photo into a feature vector once, and only a small head is trained on
  * those vectors. Training is then seconds of arithmetic on a few hundred short
- * vectors rather than backprop through a whole convnet — which is what makes
+ * vectors rather than backprop through a whole convnet, which is what makes
  * "train it in your browser" honest rather than a queued job in disguise.
  */
 
@@ -66,8 +66,8 @@ export type Embedding = Float32Array;
 /**
  * Turns a stored example into a feature vector.
  *
- * Stored examples are already square, EXAMPLE_SIZE, and mirrored — they went
- * through drawNormalized on the way in — so there is nothing to transform here.
+ * Stored examples are already square, EXAMPLE_SIZE, and mirrored, they went
+ * through drawNormalized on the way in, so there is nothing to transform here.
  */
 export async function embedBlob(blob: Blob): Promise<Embedding> {
   const tf = await getTf();
@@ -112,7 +112,7 @@ export interface EpochProgress {
 export interface TrainedHead {
   model: tfTypes.LayersModel;
   classIds: string[];
-  /** Accuracy on the training set itself — useful as a signal, not a guarantee. */
+  /** Accuracy on the training set itself, useful as a signal, not a guarantee. */
   finalAccuracy: number;
 }
 

@@ -7,11 +7,11 @@ import { useMediaDevices } from "@/lib/useMediaDevices";
 
 type CameraState = "idle" | "starting" | "running" | "denied" | "busy" | "unsupported";
 
-/** Roughly six frames a second while the button is held — fast enough to build a set, slow enough to move between shots. */
+/** Roughly six frames a second while the button is held, fast enough to build a set, slow enough to move between shots. */
 const BURST_INTERVAL_MS = 160;
 
 /**
- * Cameras spend their first moments hunting for exposure and white balance —
+ * Cameras spend their first moments hunting for exposure and white balance
  * the frames that look washed out or green-tinted. Capture is held until that
  * settles. This matters more where a camera is genuinely misbehaving: the cost
  * of those frames isn't how they look, it's them ending up in the training set.
@@ -82,7 +82,7 @@ export default function CapturePanel({
         // and its rear one.
         //
         // (An earlier version of this comment blamed facingMode for a green
-        // start-up flicker on one webcam. It wasn't ours — the same camera
+        // start-up flicker on one webcam. It wasn't ours, the same camera
         // flickers in its own vendor app.)
         const stream = await openCameraStream(
           requested || undefined,
@@ -131,7 +131,7 @@ export default function CapturePanel({
     // Without pointer capture, dragging off the button loses the release event
     // and the burst runs forever. But setPointerCapture throws for a pointer id
     // the element doesn't recognise, and an uncaught throw here would take the
-    // whole capture with it — losing the shot entirely is far worse than losing
+    // whole capture with it, losing the shot entirely is far worse than losing
     // the drag-off protection.
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -206,7 +206,7 @@ export default function CapturePanel({
                 <p className="text-sm text-foreground">
                   {state === "denied"
                     ? "Camera access was blocked. Allow it and try again."
-                    : "That camera couldn't start — it may be in use by another app."}
+                    : "That camera couldn't start. It may be in use by another app."}
                 </p>
                 <button
                   onClick={() => startCamera(deviceId)}
@@ -218,7 +218,7 @@ export default function CapturePanel({
             )}
             {state === "unsupported" && (
               <p className="max-w-sm text-sm text-foreground">
-                This browser doesn&apos;t support camera access — you can still upload photos below.
+                This browser doesn&apos;t support camera access, but you can still upload photos below.
               </p>
             )}
           </div>
@@ -252,7 +252,7 @@ export default function CapturePanel({
           <p className="text-center text-xs text-muted">
             Tap for a single photo. Both go into{" "}
             <span className="font-medium text-foreground">&ldquo;{targetName}&rdquo;</span>. Move
-            around between shots — varied angles and lighting are what make it reliable.
+            around between shots, because varied angles and lighting make it reliable.
           </p>
 
           {hasLabels && cameras.length > 1 && (

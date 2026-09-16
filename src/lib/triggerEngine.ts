@@ -12,7 +12,7 @@
  *    while" are the same kind of condition at wildly different timescales. The
  *    condition must hold for a configured dwell before it counts.
  *
- * 3. **Several cameras disagreeing.** This is the interesting one — see
+ * 3. **Several cameras disagreeing.** This is the interesting one, see
  *    `CombineRule` below.
  */
 
@@ -22,13 +22,13 @@
  * The right answer depends on what the cameras are *for*, which only the person
  * who set them up knows:
  *
- * - `any` — fires when at least one camera is sure. Correct when the cameras
+ * - `any`, fires when at least one camera is sure. Correct when the cameras
  *   watch different places (hallway, kitchen, front door), and correct for
  *   "something is present" conditions generally: a camera that can't see the
  *   dog is not evidence there is no dog.
  *
- * - `all` — every camera that has an opinion must agree. Correct for "nothing
- *   is there" conditions — "I've left my desk", "the couch is clear" — where a
+ * - `all`, every camera that has an opinion must agree. Correct for "nothing
+ *   is there" conditions, "I've left my desk", "the couch is clear", where a
  *   single camera still seeing you is conclusive proof the condition is false.
  *
  * Getting this backwards is not subtle. With `any` on an absence condition,
@@ -77,7 +77,7 @@ export interface EngineState {
   heldMs: number;
   /** True on the tick where the trigger fires. */
   fired: boolean;
-  /** Cameras currently voting yes — useful for showing which one saw it. */
+  /** Cameras currently voting yes, useful for showing which one saw it. */
   seeing: string[];
   /** True while cooling down after a fire. */
   cooling: boolean;
@@ -110,7 +110,7 @@ export class TriggerEngine {
     if (score >= this.rule.threshold) return "yes";
     if (score <= this.rule.releaseThreshold) return "no";
     // The band between the two thresholds is the honest answer to "a camera
-    // that can only see half the person". It is not weak evidence either way —
+    // that can only see half the person". It is not weak evidence either way
     // it is no evidence, and it must not drag the decision around.
     return "abstain";
   }

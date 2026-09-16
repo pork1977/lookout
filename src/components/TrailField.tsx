@@ -1,7 +1,7 @@
 /**
  * Decorative light trails behind the hero.
  *
- * Pure SVG and CSS — no canvas, no animation frames, no JavaScript running.
+ * Pure SVG and CSS, no canvas, no animation frames, no JavaScript running.
  * The live demo already asks a lot of the GPU, and a decorative background has
  * no business competing with it for frames. Colour comes from the theme tokens,
  * so it re-tints with every preset rather than being a fixed green.

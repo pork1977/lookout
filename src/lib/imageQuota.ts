@@ -67,7 +67,7 @@ export function consumeDispatchQuota(key: string): QuotaDecision {
 }
 
 /**
- * Best-effort caller identity. Only proxy-set headers are trusted — never a
+ * Best-effort caller identity. Only proxy-set headers are trusted, never a
  * client-supplied body field, which would make the quota opt-out.
  */
 export function callerKey(headers: Headers): string {

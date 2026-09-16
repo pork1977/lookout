@@ -34,7 +34,7 @@ export default function LiveDemo() {
   const accent = useThemeColor("--accent", "#5cf2a3");
 
   // Slot 0 is always the primary tile (starts on click, stays mounted for its
-  // whole life — switching its device swaps the stream in place rather than
+  // whole life, switching its device swaps the stream in place rather than
   // remounting). Any further slots are grid additions the user picked
   // explicitly, so they're safe to auto-start immediately.
   const [slots, setSlots] = useState<CameraSlot[]>([{ uid: "cam-0" }]);
@@ -53,7 +53,7 @@ export default function LiveDemo() {
 
   useEffect(() => {
     // entered starts (and is left) false whenever this effect isn't the
-    // "open" case — either at mount, or because closeExpand() already set it
+    // "open" case, either at mount, or because closeExpand() already set it
     // directly before expanded catches up on the next tick.
     if (!expanded) return;
     const raf = requestAnimationFrame(() => setEntered(true));
@@ -114,7 +114,7 @@ export default function LiveDemo() {
 
       // The primary slot exists from page load with no device attached. Always
       // appending meant picking three cameras before ever starting one left an
-      // empty fourth tile sitting beside them — so fill that slot first.
+      // empty fourth tile sitting beside them, so fill that slot first.
       const vacant = prev.findIndex((s) => !s.deviceId);
       if (vacant !== -1) {
         const next = [...prev];
@@ -174,7 +174,7 @@ export default function LiveDemo() {
     <div className="w-full">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         {picker}
-        {/* Always available, whatever the camera is doing — it used to appear
+        {/* Always available, whatever the camera is doing, it used to appear
             only once a stream was running, which made it feel like it came and
             went. */}
         <button

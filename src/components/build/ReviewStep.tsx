@@ -113,7 +113,7 @@ export default function ReviewStep({
           if (source) collected[result.id] = { ...result, classId: source.classId };
         }
       } catch (err) {
-        // A rejected batch is left unchecked rather than partly applied — the
+        // A rejected batch is left unchecked rather than partly applied, the
         // route refuses any response it can't line up with the images it sent.
         failures += batch.length;
         if (!Object.keys(collected).length && batches.length === 1) {
@@ -173,7 +173,7 @@ export default function ReviewStep({
             set on the server, and this deployment doesn&apos;t have one.
           </p>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
-            Nothing else is blocked — your photos are already sorted into the groups you put them
+            Nothing else is blocked. Your photos are already sorted into the groups you put them
             in, which is all training needs.
           </p>
         </div>
@@ -189,7 +189,7 @@ export default function ReviewStep({
           <h2 className="text-sm font-semibold text-foreground">Let Claude check your photos</h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
             Claude looks at each photo and says which group it thinks it belongs in. Where it
-            agrees with you and is confident, nothing changes. You only review the rest — the
+            agrees with you and is confident, nothing changes. You only review the rest: the
             blurry ones, the empty frames, and the ones that ended up in the wrong group.
           </p>
           <button
@@ -238,7 +238,7 @@ export default function ReviewStep({
         <>
           <div className="rounded-2xl border border-border bg-surface p-6">
             <h2 className="text-sm font-semibold text-foreground">
-              {/* "Confirmed" means nothing moved — saying "labelled" here would
+              {/* "Confirmed" means nothing moved, saying "labelled" here would
                   imply Claude changed something. */}
               {confirmed.length} photo{confirmed.length === 1 ? "" : "s"} confirmed where you put
               {confirmed.length === 1 ? " it" : " them"}
@@ -360,7 +360,7 @@ function Footer({ onBack, onContinue }: { onBack: () => void; onContinue: () => 
         </button>
       </div>
       <p className="mt-3 text-xs leading-relaxed text-muted">
-        Training runs in this tab and takes seconds — a pretrained vision model does the heavy
+        Training runs in this tab and takes seconds, because a pretrained vision model does the heavy
         lifting, and only a small classifier on top actually learns your groups.
       </p>
     </div>

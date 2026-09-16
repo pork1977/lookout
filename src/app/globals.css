@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
- * Theme tokens. One generator, six outputs — see src/lib/theme.ts for the
+ * Theme tokens. One generator, six outputs, see src/lib/theme.ts for the
  * hue/saturation formula these values come from. :root carries the Dark
  * values directly so the page still looks right before the theme script
  * runs; every other theme is an override block keyed by [data-theme].
@@ -201,7 +201,7 @@ body {
  *
  * The same tile renders at roughly 250px wide in a two-up inline grid and
  * 550px+ in the expanded overlay, so anything sized in fixed pixels either
- * overflowed the small one or looked undersized in the large one — the
+ * overflowed the small one or looked undersized in the large one, the
  * "Try again" button was ending up off-tile entirely. These size from the
  * tile's own width (cqw) instead of the viewport, clamped so text never drops
  * below legible or grows past the original design size. Everything inside
@@ -296,7 +296,7 @@ body {
  * Hero light trails.
  *
  * A bright dash is chased along each path with stroke-dashoffset, which the
- * compositor can handle on its own — no paint work per frame, and nothing for
+ * compositor can handle on its own, no paint work per frame, and nothing for
  * JavaScript to do. Long gaps between dashes keep the effect sparse; a busy
  * background would fight the live camera for attention.
  */
