@@ -10,6 +10,14 @@ type CameraState = "idle" | "starting" | "running" | "denied" | "busy" | "unsupp
 /** Roughly six frames a second while the button is held — fast enough to build a set, slow enough to move between shots. */
 const BURST_INTERVAL_MS = 160;
 
+/**
+ * Cameras spend their first moments hunting for exposure and white balance —
+ * the frames that look washed out or green-tinted. Capture is held until that
+ * settles, because the real cost of those frames isn't how they look, it's them
+ * ending up in the training set.
+ */
+const SETTLE_MS = 700;
+
 export default function CapturePanel({
   targetName,
   onCapture,
@@ -31,13 +39,32 @@ export default function CapturePanel({
   const [captured, setCaptured] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [settling, setSettling] = useState(false);
+  const settlingRef = useRef(false);
+  const settleTimerRef = useRef<number | null>(null);
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
   }, []);
 
-  useEffect(() => () => stopCamera(), [stopCamera]);
+  useEffect(
+    () => () => {
+      stopCamera();
+      if (settleTimerRef.current !== null) window.clearTimeout(settleTimerRef.current);
+    },
+    [stopCamera],
+  );
+
+  const beginSettling = useCallback(() => {
+    settlingRef.current = true;
+    setSettling(true);
+    if (settleTimerRef.current !== null) window.clearTimeout(settleTimerRef.current);
+    settleTimerRef.current = window.setTimeout(() => {
+      settlingRef.current = false;
+      setSettling(false);
+    }, SETTLE_MS);
+  }, []);
 
   const startCamera = useCallback(
     async (requested?: string) => {
@@ -48,11 +75,21 @@ export default function CapturePanel({
       setState("starting");
       stopCamera();
       try {
+        // Nothing beyond the device itself.
+        //
+        // `facingMode: "user"` was the only thing that differed between the
+        // first start and every later camera switch — which is exactly the
+        // pattern behind the green flicker: it appeared on start-up and never
+        // came back once a device had been picked explicitly, even on the same
+        // camera. It's a phone front/back hint with nothing to say about a
+        // desktop USB webcam, and asking for it made the driver renegotiate.
+        //
+        // The resolution hints go too. Every capture is centre-cropped and
+        // downscaled to 320px, so asking a 16:9 webcam for a 960x720 4:3 mode
+        // bought nothing and gave the driver another reason to reconfigure.
         const stream = await openCameraStream(
           requested || undefined,
-          requested
-            ? { deviceId: { exact: requested }, width: { ideal: 960 }, height: { ideal: 720 } }
-            : { facingMode: "user", width: { ideal: 960 }, height: { ideal: 720 } },
+          requested ? { deviceId: { exact: requested } } : {},
         );
         streamRef.current = stream;
         if (videoRef.current) {
@@ -61,19 +98,22 @@ export default function CapturePanel({
         }
         setDeviceId(stream.getVideoTracks()[0]?.getSettings().deviceId ?? "");
         setState("running");
+        beginSettling();
         refresh();
       } catch (err) {
         setState(classifyCameraError(err));
       }
     },
-    [stopCamera, refresh],
+    [stopCamera, refresh, beginSettling],
   );
 
   const captureFrame = useCallback(async () => {
     const video = videoRef.current;
     // Same guard as the detection loop: a frame grabbed before the video has
     // data is a blank square, and it would go straight into the training set.
-    if (!video || video.readyState < 2) return;
+    // Read through the ref, not the state, so a burst already in flight sees
+    // the current value rather than the one its closure captured.
+    if (!video || video.readyState < 2 || settlingRef.current) return;
     try {
       onCapture(await frameToBlob(video));
       setCaptured((n) => n + 1);
@@ -90,10 +130,17 @@ export default function CapturePanel({
   useEffect(() => () => endBurst(), [endBurst]);
 
   function beginBurst(e: React.PointerEvent<HTMLButtonElement>) {
-    if (state !== "running") return;
+    if (state !== "running" || settlingRef.current) return;
     // Without pointer capture, dragging off the button loses the release event
-    // and the burst runs forever.
-    e.currentTarget.setPointerCapture(e.pointerId);
+    // and the burst runs forever. But setPointerCapture throws for a pointer id
+    // the element doesn't recognise, and an uncaught throw here would take the
+    // whole capture with it — losing the shot entirely is far worse than losing
+    // the drag-off protection.
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      /* pointer-up and pointer-leave still end the burst */
+    }
     void captureFrame();
     endBurst();
     burstRef.current = window.setInterval(() => void captureFrame(), BURST_INTERVAL_MS);
@@ -194,13 +241,14 @@ export default function CapturePanel({
             onPointerUp={endBurst}
             onPointerCancel={endBurst}
             onPointerLeave={endBurst}
-            className="w-full select-none rounded-full px-5 py-3.5 text-sm font-semibold text-accent-ink shadow-[0_10px_30px_-8px_var(--glow)] transition-transform active:scale-[0.99]"
+            disabled={settling}
+            className="w-full select-none rounded-full px-5 py-3.5 text-sm font-semibold text-accent-ink shadow-[0_10px_30px_-8px_var(--glow)] transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
             style={{
               backgroundImage: "linear-gradient(135deg, var(--accent), var(--accent-strong))",
               touchAction: "none",
             }}
           >
-            Hold for burst images
+            {settling ? "Steadying the camera…" : "Hold for burst images"}
           </button>
           {/* The button says what it does; the line under it says where the
               photos land, so the target group is still unambiguous. */}
