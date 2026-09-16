@@ -30,8 +30,10 @@ export function getSupabase(): SupabaseClient | null {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      // No OAuth redirects in this flow, so there's nothing in the URL to read.
-      detectSessionInUrl: false,
+      // Email confirmation is a redirect flow: the link lands back here with
+      // the session in the URL fragment. With this off, those tokens sat in the
+      // hash and were ignored, so confirming an account appeared to do nothing.
+      detectSessionInUrl: true,
     },
   });
   return client;

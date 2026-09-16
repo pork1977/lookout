@@ -102,9 +102,9 @@ export default function AccountPanel({
                 Create an account, or sign in
               </h3>
               <p className="mt-1.5 text-xs leading-relaxed text-muted">
-                Optional. Your detectors already live in this browser — an account is for backing
-                them up and pulling them onto another machine. New here? Fill both fields and
-                choose <span className="text-foreground">Create account</span>.
+                Optional. Your detectors already live in this browser.
+                <br />
+                An account is for backing them up and pulling them onto another machine.
               </p>
               <div className="mt-4 space-y-2">
                 <input
@@ -145,7 +145,19 @@ export default function AccountPanel({
                   disabled={busy || !email || !password}
                   onClick={() =>
                     withBusy("Sign up", async () => {
-                      const { data, error } = await supabase.auth.signUp({ email, password });
+                      const { data, error } = await supabase.auth.signUp({
+                        email,
+                        password,
+                        options: {
+                          // Without this Supabase falls back to the project's
+                          // Site URL, which is localhost:3000 by default — so a
+                          // confirmation mail sent from production pointed at a
+                          // machine that wasn't running. Deriving it from the
+                          // current origin means the link comes back wherever
+                          // you actually signed up.
+                          emailRedirectTo: `${window.location.origin}/build`,
+                        },
+                      });
                       if (error) throw new Error(error.message);
                       setPassword("");
                       // With email confirmation on, there's no session yet and
