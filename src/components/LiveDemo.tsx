@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CameraTile from "./live-demo/CameraTile";
 import CameraPicker from "./live-demo/CameraPicker";
 import DetectionList from "./live-demo/DetectionList";
@@ -11,29 +11,43 @@ import type { TrackedDetection } from "./live-demo/types";
 const EXTRA_COLORS = ["#38bdf8", "#fb923c", "#f472b6"];
 const MAX_CAMERAS = 4;
 
+/**
+ * One active camera. `uid` is assigned when the slot is created and never
+ * reused, which is what lets a tile hold session-long tracking history:
+ * keying by array position meant removing a middle camera slid the others
+ * down and handed one camera's history to another.
+ */
+interface CameraSlot {
+  uid: string;
+  deviceId?: string;
+}
+
 export default function LiveDemo() {
   const { cameras, hasLabels, refresh } = useMediaDevices();
   const accent = useThemeColor("--accent", "#5cf2a3");
 
-  // Index 0 is always the primary tile (starts on click, stays mounted for
-  // its whole life — switching its device swaps the stream in place rather
-  // than remounting). Any further entries are grid additions the user
-  // picked explicitly, so they're safe to auto-start immediately.
-  const [activeIds, setActiveIds] = useState<Array<string | undefined>>([undefined]);
-  const [hasStarted, setHasStarted] = useState(false);
-  // Keyed by tile index (not label/order-of-arrival) so the list's order
-  // always matches the on-screen tile order, not whichever camera's frame
-  // happened to resolve first this tick.
-  const [detectionsByTile, setDetectionsByTile] = useState<Record<number, TrackedDetection[]>>(
-    {},
-  );
+  // Slot 0 is always the primary tile (starts on click, stays mounted for its
+  // whole life — switching its device swaps the stream in place rather than
+  // remounting). Any further slots are grid additions the user picked
+  // explicitly, so they're safe to auto-start immediately.
+  const [slots, setSlots] = useState<CameraSlot[]>([{ uid: "cam-0" }]);
+  const nextUid = useRef(1);
+  const [detectionsByUid, setDetectionsByUid] = useState<Record<string, TrackedDetection[]>>({});
+  // Lifted out of CameraPicker: the picker now renders in two places at once,
+  // and compare mode has to mean the same thing in both.
+  const [compareMode, setCompareMode] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [entered, setEntered] = useState(false);
 
+  const closeExpand = useCallback(() => {
+    setEntered(false);
+    window.setTimeout(() => setExpanded(false), 220);
+  }, []);
+
   useEffect(() => {
     // entered starts (and is left) false whenever this effect isn't the
-    // "open" case — either at mount, or because closeExpand() already set
-    // it directly before expanded catches up on the next tick.
+    // "open" case — either at mount, or because closeExpand() already set it
+    // directly before expanded catches up on the next tick.
     if (!expanded) return;
     const raf = requestAnimationFrame(() => setEntered(true));
     document.body.style.overflow = "hidden";
@@ -46,13 +60,7 @@ export default function LiveDemo() {
       document.body.style.overflow = "";
       document.removeEventListener("keydown", onKeyDown);
     };
-     
-  }, [expanded]);
-
-  function closeExpand() {
-    setEntered(false);
-    window.setTimeout(() => setExpanded(false), 220);
-  }
+  }, [expanded, closeExpand]);
 
   const colorFor = useCallback(
     (i: number) => (i === 0 ? accent : EXTRA_COLORS[(i - 1) % EXTRA_COLORS.length]),
@@ -67,72 +75,97 @@ export default function LiveDemo() {
     [cameras],
   );
 
-  const handleDetections = useCallback((tileIndex: number, detections: TrackedDetection[]) => {
-    setDetectionsByTile((prev) => ({ ...prev, [tileIndex]: detections }));
+  const handleDetections = useCallback((uid: string, detections: TrackedDetection[]) => {
+    setDetectionsByUid((prev) => ({ ...prev, [uid]: detections }));
   }, []);
 
   const handlePrimaryStart = useCallback(
     (deviceId?: string) => {
-      setHasStarted(true);
       refresh();
-      if (deviceId) setActiveIds((prev) => [deviceId, ...prev.slice(1)]);
+      if (deviceId) {
+        setSlots((prev) => [{ ...prev[0], deviceId }, ...prev.slice(1)]);
+      }
     },
     [refresh],
   );
 
-  // Radio behavior: replace whichever camera is primary with this one.
-  function selectPrimary(deviceId: string) {
-    setActiveIds([deviceId]);
-  }
+  // Radio behavior: replace whichever camera is primary with this one. The uid
+  // is carried over deliberately so the tile swaps its stream rather than
+  // remounting and re-prompting for permission.
+  const selectPrimary = useCallback((deviceId: string) => {
+    setSlots((prev) => [{ uid: prev[0].uid, deviceId }]);
+  }, []);
 
   // Checkbox behavior (compare mode): add/remove this camera from the grid.
-  function toggleGridMember(deviceId: string) {
-    setActiveIds((prev) => {
-      if (prev.includes(deviceId)) {
-        return prev.length > 1 ? prev.filter((id) => id !== deviceId) : prev;
+  const toggleGridMember = useCallback((deviceId: string) => {
+    const uid = `cam-${nextUid.current}`;
+    setSlots((prev) => {
+      if (prev.some((s) => s.deviceId === deviceId)) {
+        return prev.length > 1 ? prev.filter((s) => s.deviceId !== deviceId) : prev;
       }
-      return prev.length >= MAX_CAMERAS ? prev : [...prev, deviceId];
+      if (prev.length >= MAX_CAMERAS) return prev;
+      return [...prev, { uid, deviceId }];
     });
-  }
+    nextUid.current += 1;
+  }, []);
 
-  function collapseToSingle() {
-    setActiveIds((prev) => [prev[0]]);
-  }
+  const collapseToSingle = useCallback(() => {
+    setSlots((prev) => prev.slice(0, 1));
+  }, []);
 
-  function removeCamera(index: number) {
-    setActiveIds((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev));
-  }
+  const removeCamera = useCallback((uid: string) => {
+    setSlots((prev) => (prev.length > 1 ? prev.filter((s) => s.uid !== uid) : prev));
+  }, []);
 
-  const grid = activeIds.length > 1;
+  const grid = slots.length > 1;
+  const activeIds = useMemo(
+    () => slots.map((s) => s.deviceId).filter((id): id is string => !!id),
+    [slots],
+  );
 
+  // Reading through the live slots means a removed camera's rows disappear
+  // with it, without needing to prune the record in an effect.
   const allDetections = useMemo(
-    () => activeIds.flatMap((_, i) => detectionsByTile[i] ?? []),
-    [activeIds, detectionsByTile],
+    () => slots.flatMap((s) => detectionsByUid[s.uid] ?? []),
+    [slots, detectionsByUid],
+  );
+
+  const picker = (
+    <CameraPicker
+      cameras={cameras}
+      hasLabels={hasLabels}
+      activeIds={activeIds}
+      maxActive={MAX_CAMERAS}
+      compareMode={compareMode}
+      onCompareModeChange={setCompareMode}
+      onSelectPrimary={selectPrimary}
+      onToggleGridMember={toggleGridMember}
+      onCollapseToSingle={collapseToSingle}
+    />
   );
 
   return (
     <div className="w-full">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <CameraPicker
-          cameras={cameras}
-          hasLabels={hasLabels}
-          activeIds={activeIds.filter((id): id is string => !!id)}
-          maxActive={MAX_CAMERAS}
-          onSelectPrimary={selectPrimary}
-          onToggleGridMember={toggleGridMember}
-          onCollapseToSingle={collapseToSingle}
-        />
-        {hasStarted && (
-          <button
-            onClick={() => setExpanded(true)}
-            className="hidden items-center gap-1.5 rounded-full border border-border-strong px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-surface-raised lg:flex"
+        {picker}
+        {/* Always available, whatever the camera is doing — it used to appear
+            only once a stream was running, which made it feel like it came and
+            went. */}
+        <button
+          onClick={() => setExpanded(true)}
+          className="hidden items-center gap-1.5 rounded-full border border-border-strong px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-surface-raised lg:flex"
+        >
+          <svg
+            viewBox="0 0 16 16"
+            className="h-3.5 w-3.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.6}
           >
-            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={1.6}>
-              <path d="M6 2H2v4M10 14h4v-4M14 2 9 7M2 14l5-5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Expand
-          </button>
-        )}
+            <path d="M6 2H2v4M10 14h4v-4M14 2 9 7M2 14l5-5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Expand
+        </button>
       </div>
 
       {/* Single persistent wrapper: only its own styling toggles between
@@ -165,14 +198,23 @@ export default function LiveDemo() {
         }
       >
         <div
-          className={expanded ? "glow-ring w-full rounded-2xl border border-border-strong bg-background" : "w-full"}
+          className={
+            expanded
+              ? "glow-ring w-full rounded-2xl border border-border-strong bg-background"
+              : "w-full"
+          }
           style={
             expanded
               ? {
                   maxWidth: "1180px",
                   padding: "1.25rem",
                   maxHeight: "calc(100vh - 3rem)",
-                  overflowY: "auto",
+                  // The panel itself must not scroll: the camera picker's
+                  // dropdown lives in the header and would be clipped by it.
+                  // Scrolling is delegated to the body row below instead.
+                  display: "flex",
+                  flexDirection: "column",
+                  overflow: "visible",
                   transform: entered ? "scale(1)" : "scale(0.94)",
                   opacity: entered ? 1 : 0,
                   transition: "transform 280ms cubic-bezier(0.2,0.8,0.2,1), opacity 220ms ease",
@@ -181,8 +223,11 @@ export default function LiveDemo() {
           }
         >
           {expanded && (
-            <div className="mb-4 flex items-center justify-between">
-              <span className="text-sm font-semibold text-foreground">Live detection</span>
+            <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-sm font-semibold text-foreground">Live detection</span>
+                {picker}
+              </div>
               <button
                 onClick={closeExpand}
                 className="rounded-full border border-border-strong px-3 py-1.5 text-xs font-medium text-foreground hover:bg-surface-raised"
@@ -192,29 +237,45 @@ export default function LiveDemo() {
             </div>
           )}
 
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
+          <div
+            className={
+              expanded
+                ? "flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:items-stretch"
+                : "w-full"
+            }
+            style={expanded ? { overflowY: "auto", scrollbarGutter: "stable" } : undefined}
+          >
             <div className="min-w-0 flex-1">
               <div className={grid ? "grid grid-cols-1 gap-3 sm:grid-cols-2" : ""}>
-                {activeIds.map((deviceId, i) => (
+                {slots.map((slot, i) => (
                   <CameraTile
-                    key={i}
-                    deviceId={deviceId}
-                    tileIndex={i}
-                    cameraLabel={labelFor(deviceId, i)}
+                    key={slot.uid}
+                    uid={slot.uid}
+                    deviceId={slot.deviceId}
+                    cameraLabel={labelFor(slot.deviceId, i)}
                     color={colorFor(i)}
                     compact={grid}
                     autoStart={i > 0}
+                    showBadgeNumbers={expanded}
                     onDetections={handleDetections}
                     onStart={i === 0 ? handlePrimaryStart : undefined}
-                    onRemove={i > 0 ? () => removeCamera(i) : undefined}
+                    onRemove={i > 0 ? removeCamera : undefined}
                   />
                 ))}
               </div>
             </div>
 
-            <div className={expanded ? "w-full shrink-0 lg:min-h-0 lg:w-80" : "w-full shrink-0 lg:min-h-0 lg:w-72"}>
-              <DetectionList detections={allDetections} showCamera={grid} />
-            </div>
+            {/* Tracking lives in the expanded view only. Inline, it competed
+                with the camera for width and its growing/shrinking height was
+                what pushed the whole frame around. */}
+            {expanded && (
+              <div
+                className="w-full shrink-0 lg:min-h-0 lg:w-80"
+                style={{ maxHeight: "60vh" }}
+              >
+                <DetectionList detections={allDetections} showCamera={grid} />
+              </div>
+            )}
           </div>
         </div>
       </div>

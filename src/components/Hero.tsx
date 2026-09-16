@@ -1,8 +1,14 @@
 import LiveDemo from "./LiveDemo";
 
 export default function Hero() {
+  // scroll-mt clears the sticky header, so the CTAs land on the section rather
+  // than under the banner. Both CTAs now point here too, so they no longer stop
+  // at two slightly different places.
   return (
-    <section id="demo" className="relative overflow-hidden border-b border-border py-20 sm:py-28">
+    <section
+      id="demo"
+      className="relative scroll-mt-24 overflow-hidden border-b border-border py-20 sm:py-28"
+    >
       <div
         className="ambient-glow -left-40 -top-40 h-[420px] w-[420px]"
         aria-hidden
@@ -28,7 +34,7 @@ export default function Hero() {
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-4">
             <a
-              href="#demo-frame"
+              href="#demo"
               className="rounded-full px-6 py-3 text-sm font-semibold text-accent-ink shadow-[0_10px_30px_-8px_var(--glow)] transition-transform hover:scale-[1.02]"
               style={{
                 backgroundImage: "linear-gradient(135deg, var(--accent), var(--accent-strong))",

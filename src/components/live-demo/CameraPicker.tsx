@@ -3,11 +3,20 @@
 import { useEffect, useRef, useState } from "react";
 import type { CameraDevice } from "@/lib/useMediaDevices";
 
+/**
+ * Rendered in two places at once — above the inline camera and inside the
+ * expanded overlay. Only `open` is local to each copy; every piece of state
+ * that has to agree between them (which cameras are active, whether compare
+ * mode is on) lives in the parent, so changing the camera in one place is
+ * immediately reflected in the other.
+ */
 export default function CameraPicker({
   cameras,
   hasLabels,
   activeIds,
   maxActive,
+  compareMode,
+  onCompareModeChange,
   onSelectPrimary,
   onToggleGridMember,
   onCollapseToSingle,
@@ -16,15 +25,14 @@ export default function CameraPicker({
   hasLabels: boolean;
   activeIds: string[];
   maxActive: number;
+  compareMode: boolean;
+  onCompareModeChange: (compare: boolean) => void;
   onSelectPrimary: (deviceId: string) => void;
   onToggleGridMember: (deviceId: string) => void;
   onCollapseToSingle: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [manualCompare, setManualCompare] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-
-  const compareMode = manualCompare || activeIds.length > 1;
 
   useEffect(() => {
     function onPointerDown(event: PointerEvent) {
@@ -35,10 +43,11 @@ export default function CameraPicker({
   }, []);
 
   if (!hasLabels) {
+    // Browsers withhold device labels until camera permission has been granted
+    // once, so there is nothing useful to pick from yet. Wording stays neutral
+    // because this also renders inside the overlay, where "above" means nothing.
     return (
-      <span className="text-xs text-muted">
-        Start a camera above, then switch devices or add more here.
-      </span>
+      <span className="text-xs text-muted">Start a camera to switch or add devices.</span>
     );
   }
 
@@ -54,7 +63,7 @@ export default function CameraPicker({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-10 z-30 w-72 rounded-xl border border-border-strong bg-surface p-1.5 shadow-2xl">
+        <div className="absolute left-0 top-10 z-40 w-72 rounded-xl border border-border-strong bg-surface p-1.5 shadow-2xl">
           <p className="px-2.5 pb-1.5 pt-1 text-[11px] text-muted">
             {compareMode
               ? `Select up to ${maxActive} cameras to view side by side.`
@@ -82,7 +91,13 @@ export default function CameraPicker({
                   }}
                 >
                   {checked && (
-                    <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none" stroke="#06170f" strokeWidth={2}>
+                    <svg
+                      viewBox="0 0 12 12"
+                      className="h-2.5 w-2.5"
+                      fill="none"
+                      stroke="var(--accent-ink)"
+                      strokeWidth={2}
+                    >
                       <path d="M2 6.5 4.8 9 10 3" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   )}
@@ -96,10 +111,10 @@ export default function CameraPicker({
             <button
               onClick={() => {
                 if (compareMode) {
-                  setManualCompare(false);
+                  onCompareModeChange(false);
                   onCollapseToSingle();
                 } else {
-                  setManualCompare(true);
+                  onCompareModeChange(true);
                 }
               }}
               className="w-full rounded-lg px-2.5 py-2 text-left text-xs font-medium text-accent hover:bg-surface-raised"
