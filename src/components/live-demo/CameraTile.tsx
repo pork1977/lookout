@@ -12,8 +12,40 @@ type TileStatus =
   | "loading-model"
   | "running"
   | "camera-denied"
+  | "camera-busy"
   | "unsupported"
   | "error";
+
+/**
+ * Resolution rungs tried in order when a camera won't open.
+ *
+ * Several USB webcams on one controller can exceed the bus's bandwidth, and the
+ * third one to start then fails outright — which is a resource problem, not a
+ * permission problem, and dropping the resolution is the standard way out of it.
+ * `deviceId: { exact }` is re-applied on every rung on purpose: relaxing it
+ * would let the browser quietly hand back a *different* camera, and the tile
+ * would show the wrong feed under the right name.
+ */
+const CONSTRAINT_LADDER: MediaTrackConstraints[] = [
+  { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 20 } },
+  { width: { ideal: 320 }, height: { ideal: 240 }, frameRate: { ideal: 15 } },
+  {},
+];
+
+/** Failures worth retrying at a lower resolution. A denied permission is not one. */
+const RESOURCE_ERRORS = new Set(["NotReadableError", "AbortError", "OverconstrainedError"]);
+
+/**
+ * "Blocked or unavailable" covered both cases and explained neither. A camera
+ * the bus can't fit is a different problem from one the user declined, and only
+ * one of them is fixed by changing a permission.
+ */
+function failureStatus(err: unknown): TileStatus {
+  const name = (err as DOMException)?.name;
+  if (name === "NotAllowedError" || name === "SecurityError") return "camera-denied";
+  if (RESOURCE_ERRORS.has(name)) return "camera-busy";
+  return "camera-denied";
+}
 
 /**
  * Floor on the gap between detections. Running detect() as fast as
@@ -82,7 +114,6 @@ function CameraTile({
   // theme color or the expanded state changed.
   const compactRef = useRef(compact);
   const colorRef = useRef(color);
-  const cameraLabelRef = useRef(cameraLabel);
   const badgesRef = useRef(showBadgeNumbers);
 
   /**
@@ -105,6 +136,12 @@ function CameraTile({
   const [status, setStatus] = useState<TileStatus>("idle");
   const [liveCount, setLiveCount] = useState(0);
   const [quality, setQuality] = useState<"fast" | "accurate">("fast");
+  /**
+   * `autoStart` means "start on mount", and it was also standing in for "this
+   * tile is never started by hand" — which left a stopped grid camera with no
+   * way back, showing "waiting for permission" forever. This splits the two.
+   */
+  const [everStarted, setEverStarted] = useState(false);
 
   // The detector starts on the small base and swaps itself for the accurate one
   // a few seconds later. Polling for that is worth the handful of lines: without
@@ -121,9 +158,24 @@ function CameraTile({
   useEffect(() => {
     compactRef.current = compact;
     colorRef.current = color;
-    cameraLabelRef.current = cameraLabel;
     badgesRef.current = showBadgeNumbers;
-  }, [compact, color, cameraLabel, showBadgeNumbers]);
+  }, [compact, color, showBadgeNumbers]);
+
+  // Going into grid mode means more cameras are competing for the same USB
+  // bandwidth, so the already-running tile gives some back rather than holding
+  // the full-size stream it opened with. A rejection here is fine — the stream
+  // simply keeps its current resolution.
+  useEffect(() => {
+    if (!compact) return;
+    const track = streamRef.current?.getVideoTracks()[0];
+    void track
+      ?.applyConstraints({
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+        frameRate: { ideal: 20 },
+      })
+      .catch(() => undefined);
+  }, [compact]);
 
   const emit = useCallback(
     (force: boolean) => {
@@ -145,7 +197,9 @@ function CameraTile({
       lastSignatureRef.current = signature;
       lastEmitRef.current = now;
 
-      const cameraColor = colorRef.current;
+      // Camera identity deliberately isn't part of this payload: it lives on
+      // the group in the parent, so a theme change repaints immediately instead
+      // of waiting for the next signature change to push a new color through.
       onDetections(
         uid,
         entries.map((e) => ({
@@ -155,9 +209,6 @@ function CameraTile({
           score: e.score,
           count: e.count,
           active: e.active,
-          cameraLabel: cameraLabelRef.current,
-          cameraColor,
-          cameraInk: inkFor(cameraColor),
         })),
       );
     },
@@ -371,16 +422,36 @@ function CameraTile({
   }, [emit]);
 
   const requestStream = useCallback(async (targetDeviceId: string | undefined) => {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: targetDeviceId
-        ? {
-            deviceId: { exact: targetDeviceId },
-            width: { ideal: compactRef.current ? 480 : 960 },
-            height: { ideal: compactRef.current ? 360 : 720 },
-          }
-        : { facingMode: "user", width: { ideal: 960 }, height: { ideal: 720 } },
-      audio: false,
-    });
+    const preferred: MediaTrackConstraints = targetDeviceId
+      ? {
+          deviceId: { exact: targetDeviceId },
+          width: { ideal: compactRef.current ? 480 : 960 },
+          height: { ideal: compactRef.current ? 360 : 720 },
+        }
+      : { facingMode: "user", width: { ideal: 960 }, height: { ideal: 720 } };
+
+    const rungs = [
+      preferred,
+      ...CONSTRAINT_LADDER.map((rung) =>
+        targetDeviceId ? { ...rung, deviceId: { exact: targetDeviceId } } : rung,
+      ),
+    ];
+
+    let stream: MediaStream | null = null;
+    let lastError: unknown;
+    for (const video of rungs) {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
+        break;
+      } catch (err) {
+        lastError = err;
+        // Retrying a refused permission at a lower resolution is pointless and
+        // makes the UI feel broken, so only resource failures walk the ladder.
+        if (!RESOURCE_ERRORS.has((err as DOMException)?.name)) throw err;
+      }
+    }
+    if (!stream) throw lastError;
+
     streamRef.current = stream;
     if (videoRef.current) {
       videoRef.current.srcObject = stream;
@@ -400,8 +471,8 @@ function CameraTile({
     let resolvedId: string | undefined;
     try {
       resolvedId = await requestStream(deviceId);
-    } catch {
-      setStatus("camera-denied");
+    } catch (err) {
+      setStatus(failureStatus(err));
       return;
     }
 
@@ -414,6 +485,7 @@ function CameraTile({
     }
 
     hasStartedOnceRef.current = true;
+    setEverStarted(true);
     setStatus("running");
     onStart?.(resolvedId);
     startLoop();
@@ -447,8 +519,8 @@ function CameraTile({
       setStatus("requesting-camera");
       try {
         await requestStream(deviceId);
-      } catch {
-        setStatus("camera-denied");
+      } catch (err) {
+        setStatus(failureStatus(err));
         return;
       }
       setStatus("running");
@@ -477,7 +549,7 @@ function CameraTile({
 
       {status !== "running" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/80 px-6 text-center backdrop-blur-sm">
-          {status === "idle" && !autoStart && (
+          {status === "idle" && (everStarted || !autoStart) && (
             <>
               <button
                 onClick={start}
@@ -486,23 +558,33 @@ function CameraTile({
                   backgroundImage: "linear-gradient(135deg, var(--accent), var(--accent-strong))",
                 }}
               >
-                Try it on your camera
+                {everStarted ? "Start camera" : "Try it on your camera"}
               </button>
-              <p className={compact ? "text-[11px] text-muted" : "max-w-sm text-xs text-muted"}>
-                Runs a real object-detection model live in this tab. Nothing is uploaded anywhere.
-              </p>
+              {!everStarted && (
+                <p className={compact ? "text-[11px] text-muted" : "max-w-sm text-xs text-muted"}>
+                  Runs a real object-detection model live in this tab. Nothing is uploaded anywhere.
+                </p>
+              )}
             </>
           )}
-          {(status === "idle" && autoStart) || status === "requesting-camera" ? (
+          {(status === "idle" && autoStart && !everStarted) || status === "requesting-camera" ? (
             <p className="text-xs text-muted">Waiting for camera permission…</p>
           ) : null}
           {status === "loading-model" && (
             <p className="animate-scan-pulse text-xs text-muted">Loading the vision model…</p>
           )}
-          {status === "camera-denied" && (
+          {(status === "camera-denied" || status === "camera-busy") && (
             <div className="max-w-sm space-y-3">
               <p className="text-sm text-foreground">
-                {cameraLabel} was blocked or is unavailable. Allow camera permission and try again.
+                {status === "camera-denied" ? (
+                  <>{cameraLabel} was blocked. Allow camera permission and try again.</>
+                ) : (
+                  <>
+                    {cameraLabel} couldn&apos;t start. It may be in use by another app, or your USB
+                    controller may not have the bandwidth for this many cameras at once — try
+                    stopping one of the others.
+                  </>
+                )}
               </p>
               <button
                 onClick={start}

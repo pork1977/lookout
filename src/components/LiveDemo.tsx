@@ -6,7 +6,7 @@ import CameraPicker from "./live-demo/CameraPicker";
 import DetectionList from "./live-demo/DetectionList";
 import { useMediaDevices } from "@/lib/useMediaDevices";
 import { useThemeColor } from "@/lib/useThemeColor";
-import type { TrackedDetection } from "./live-demo/types";
+import type { DetectionGroup, TrackedDetection } from "./live-demo/types";
 
 const EXTRA_COLORS = ["#38bdf8", "#fb923c", "#f472b6"];
 const MAX_CAMERAS = 4;
@@ -123,11 +123,20 @@ export default function LiveDemo() {
     [slots],
   );
 
-  // Reading through the live slots means a removed camera's rows disappear
-  // with it, without needing to prune the record in an effect.
-  const allDetections = useMemo(
-    () => slots.flatMap((s) => detectionsByUid[s.uid] ?? []),
-    [slots, detectionsByUid],
+  // Built from the live slots, so a removed camera's rows disappear with it and
+  // the record needs no pruning. Camera identity is attached here rather than
+  // inside each detection: the tiles emit behind a change-signature throttle
+  // that can't see a theme switch, so sourcing color at this level means a
+  // theme change repaints the list immediately.
+  const groups: DetectionGroup[] = useMemo(
+    () =>
+      slots.map((s, i) => ({
+        uid: s.uid,
+        cameraLabel: labelFor(s.deviceId, i),
+        cameraColor: colorFor(i),
+        detections: detectionsByUid[s.uid] ?? [],
+      })),
+    [slots, detectionsByUid, labelFor, colorFor],
   );
 
   const picker = (
@@ -273,7 +282,7 @@ export default function LiveDemo() {
                 className="w-full shrink-0 lg:min-h-0 lg:w-80"
                 style={{ maxHeight: "60vh" }}
               >
-                <DetectionList detections={allDetections} showCamera={grid} />
+                <DetectionList groups={groups} grouped={grid} />
               </div>
             )}
           </div>

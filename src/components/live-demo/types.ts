@@ -15,9 +15,19 @@ export interface TrackedDetection {
   count: number;
   /** False once the object leaves frame. The row stays, heavily faded — it is never removed. */
   active: boolean;
-  /** Which camera tile this came from, for the shared tracking list in grid mode. */
+}
+
+/**
+ * One camera's worth of tracking, for the grouped list.
+ *
+ * Camera identity lives here rather than repeated on every detection: the tile
+ * emits a few times a second behind a change-signature throttle that doesn't
+ * include color, so a theme switch couldn't propagate through it. Sourcing the
+ * color from the parent instead means theme changes land immediately.
+ */
+export interface DetectionGroup {
+  uid: string;
   cameraLabel: string;
   cameraColor: string;
-  /** Readable text color on top of cameraColor, resolved once in the browser. */
-  cameraInk: string;
+  detections: TrackedDetection[];
 }
