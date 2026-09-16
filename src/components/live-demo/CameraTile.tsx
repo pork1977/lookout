@@ -4,6 +4,7 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { DetectedObject } from "@tensorflow-models/coco-ssd";
 import { ADMIT_SCORE, detect, detectorQuality, startDetector } from "@/lib/detectorModel";
 import { inkFor } from "@/lib/colorInk";
+import { classifyCameraError, openCameraStream } from "@/lib/cameraStream";
 import type { TrackedDetection } from "./types";
 
 type TileStatus =
@@ -15,37 +16,6 @@ type TileStatus =
   | "camera-busy"
   | "unsupported"
   | "error";
-
-/**
- * Resolution rungs tried in order when a camera won't open.
- *
- * Several USB webcams on one controller can exceed the bus's bandwidth, and the
- * third one to start then fails outright — which is a resource problem, not a
- * permission problem, and dropping the resolution is the standard way out of it.
- * `deviceId: { exact }` is re-applied on every rung on purpose: relaxing it
- * would let the browser quietly hand back a *different* camera, and the tile
- * would show the wrong feed under the right name.
- */
-const CONSTRAINT_LADDER: MediaTrackConstraints[] = [
-  { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 20 } },
-  { width: { ideal: 320 }, height: { ideal: 240 }, frameRate: { ideal: 15 } },
-  {},
-];
-
-/** Failures worth retrying at a lower resolution. A denied permission is not one. */
-const RESOURCE_ERRORS = new Set(["NotReadableError", "AbortError", "OverconstrainedError"]);
-
-/**
- * "Blocked or unavailable" covered both cases and explained neither. A camera
- * the bus can't fit is a different problem from one the user declined, and only
- * one of them is fixed by changing a permission.
- */
-function failureStatus(err: unknown): TileStatus {
-  const name = (err as DOMException)?.name;
-  if (name === "NotAllowedError" || name === "SecurityError") return "camera-denied";
-  if (RESOURCE_ERRORS.has(name)) return "camera-busy";
-  return "camera-denied";
-}
 
 /**
  * Floor on the gap between detections. Running detect() as fast as
@@ -422,35 +392,16 @@ function CameraTile({
   }, [emit]);
 
   const requestStream = useCallback(async (targetDeviceId: string | undefined) => {
-    const preferred: MediaTrackConstraints = targetDeviceId
-      ? {
-          deviceId: { exact: targetDeviceId },
-          width: { ideal: compactRef.current ? 480 : 960 },
-          height: { ideal: compactRef.current ? 360 : 720 },
-        }
-      : { facingMode: "user", width: { ideal: 960 }, height: { ideal: 720 } };
-
-    const rungs = [
-      preferred,
-      ...CONSTRAINT_LADDER.map((rung) =>
-        targetDeviceId ? { ...rung, deviceId: { exact: targetDeviceId } } : rung,
-      ),
-    ];
-
-    let stream: MediaStream | null = null;
-    let lastError: unknown;
-    for (const video of rungs) {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
-        break;
-      } catch (err) {
-        lastError = err;
-        // Retrying a refused permission at a lower resolution is pointless and
-        // makes the UI feel broken, so only resource failures walk the ladder.
-        if (!RESOURCE_ERRORS.has((err as DOMException)?.name)) throw err;
-      }
-    }
-    if (!stream) throw lastError;
+    const stream = await openCameraStream(
+      targetDeviceId,
+      targetDeviceId
+        ? {
+            deviceId: { exact: targetDeviceId },
+            width: { ideal: compactRef.current ? 480 : 960 },
+            height: { ideal: compactRef.current ? 360 : 720 },
+          }
+        : { facingMode: "user", width: { ideal: 960 }, height: { ideal: 720 } },
+    );
 
     streamRef.current = stream;
     if (videoRef.current) {
@@ -472,7 +423,7 @@ function CameraTile({
     try {
       resolvedId = await requestStream(deviceId);
     } catch (err) {
-      setStatus(failureStatus(err));
+      setStatus(classifyCameraError(err) === "busy" ? "camera-busy" : "camera-denied");
       return;
     }
 
@@ -520,7 +471,7 @@ function CameraTile({
       try {
         await requestStream(deviceId);
       } catch (err) {
-        setStatus(failureStatus(err));
+        setStatus(classifyCameraError(err) === "busy" ? "camera-busy" : "camera-denied");
         return;
       }
       setStatus("running");
