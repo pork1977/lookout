@@ -345,3 +345,17 @@ body {
     opacity: 0;
   }
 }
+
+/* "What it's looking at" glow. Screen blending makes it read as light on the
+   dark themes; on Light, whose accent is a dark green, screen would all but
+   erase it, so it tints normally instead. */
+.attention-overlay {
+  opacity: 0.75;
+  filter: blur(10px);
+  mix-blend-mode: screen;
+  transition: opacity 200ms ease;
+}
+[data-theme="light"] .attention-overlay {
+  opacity: 0.55;
+  mix-blend-mode: normal;
+}

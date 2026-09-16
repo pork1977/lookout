@@ -2,6 +2,7 @@
 
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { classifyCameraError, openCameraStream } from "@/lib/cameraStream";
+import AttentionOverlay from "./AttentionOverlay";
 
 export type WatchStatus = "idle" | "starting" | "running" | "denied" | "busy";
 
@@ -19,6 +20,7 @@ function WatchTile({
   compact,
   score,
   seeing,
+  attentionMap,
   armed,
   onRemove,
   registerVideo,
@@ -32,6 +34,8 @@ function WatchTile({
   /** Smoothed score for the watched group, or null before the first reading. */
   score: number | null;
   seeing: boolean;
+  /** Present only while the "what it's looking at" switch is on and watching. */
+  attentionMap: Float32Array | null;
   armed: boolean;
   onRemove?: (uid: string) => void;
   registerVideo: (uid: string, video: HTMLVideoElement | null) => void;
@@ -111,6 +115,7 @@ function WatchTile({
         muted
         className="absolute inset-0 h-full w-full -scale-x-100 object-cover"
       />
+      {status === "running" && attentionMap && <AttentionOverlay map={attentionMap} />}
 
       {status === "running" && (
         <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 bg-gradient-to-b from-black/55 to-transparent px-3 py-2">

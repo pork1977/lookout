@@ -5,14 +5,14 @@ import { classifyCameraError, openCameraStream } from "@/lib/cameraStream";
 import { drawFrameForInference } from "@/lib/imageCapture";
 import {
   embedBlob,
-  embedCanvas,
   loadExtractor,
-  predict,
+  readFrame,
   trainHead,
   type EpochProgress,
   type TrainedHead,
   type TrainingSample,
 } from "@/lib/trainer";
+import AttentionOverlay, { AttentionToggle, useAttention } from "./AttentionOverlay";
 import ProgressBar from "./ProgressBar";
 import type { DetectorClass } from "./types";
 
@@ -46,6 +46,13 @@ export default function TrainStep({
     "idle",
   );
   const [scores, setScores] = useState<number[] | null>(null);
+  const [maps, setMaps] = useState<Float32Array[] | null>(null);
+  const attention = useAttention(!!head);
+  // Read by the loop each tick, so flipping the switch doesn't restart it.
+  const attentionOnRef = useRef(attention.on);
+  useEffect(() => {
+    attentionOnRef.current = attention.on;
+  }, [attention.on]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const workCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -145,9 +152,11 @@ export default function TrainStep({
         // centre-cropped, which is the whole reason this goes through the
         // shared helper rather than reading the video directly.
         drawFrameForInference(video, canvas);
-        const embedding = await embedCanvas(canvas);
-        const probabilities = await predict(head, embedding);
-        if (!cancelled) setScores(probabilities);
+        const reading = await readFrame(head, canvas, attentionOnRef.current);
+        if (!cancelled) {
+          setScores(reading.probabilities);
+          setMaps(reading.maps);
+        }
       } catch {
         /* a dropped frame isn't worth tearing the loop down */
       } finally {
@@ -275,6 +284,9 @@ export default function TrainStep({
                 muted
                 className="absolute inset-0 h-full w-full -scale-x-100 object-cover"
               />
+              {attention.on && cameraState === "running" && (
+                <AttentionOverlay map={maps && leader >= 0 ? maps[leader] : null} />
+              )}
               {cameraState !== "running" && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/85 px-6 text-center backdrop-blur-sm">
                   {cameraState === "idle" && (
@@ -361,6 +373,17 @@ export default function TrainStep({
               </div>
               {!scores && cameraState === "running" && (
                 <p className="mt-4 text-xs text-muted">Reading the first frames…</p>
+              )}
+              {attention.available && (
+                <div className="mt-5 border-t border-border pt-4">
+                  <AttentionToggle on={attention.on} onToggle={attention.toggle} />
+                  {attention.on && leader >= 0 && (
+                    <p className="mt-2 pl-12 text-xs text-muted">
+                      Showing what reads as{" "}
+                      <span className="text-accent">{classes[leader]?.name || "Untitled group"}</span>.
+                    </p>
+                  )}
+                </div>
               )}
               <p className="mt-5 border-t border-border pt-4 text-xs leading-relaxed text-muted">
                 Weak spot? Go back to Examples, add photos of the case it gets wrong, and train

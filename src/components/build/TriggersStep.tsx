@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { drawFrameForInference } from "@/lib/imageCapture";
-import { embedCanvas, predict, type TrainedHead } from "@/lib/trainer";
+import { readFrame, type TrainedHead } from "@/lib/trainer";
 import {
   DEFAULT_RULE,
   TriggerEngine,
@@ -26,6 +26,7 @@ import {
   type ServerActionId,
   type SpeechOptions,
 } from "@/lib/triggerActions";
+import { AttentionToggle, useAttention } from "./AttentionOverlay";
 import ProgressBar from "./ProgressBar";
 import type { DetectorClass } from "./types";
 import WatchTile, { type WatchStatus } from "./WatchTile";
@@ -85,10 +86,16 @@ export default function TriggersStep({
   const [armed, setArmed] = useState(false);
   const [cameras, setCameras] = useState<WatchCamera[]>([{ uid: "cam-0", autoStart: false }]);
   const [statuses, setStatuses] = useState<Record<string, WatchStatus>>({});
-  const [live, setLive] = useState<{ scores: Record<string, number>; seeing: string[] }>({
-    scores: {},
-    seeing: [],
-  });
+  const [live, setLive] = useState<{
+    scores: Record<string, number>;
+    seeing: string[];
+    maps: Record<string, Float32Array>;
+  }>({ scores: {}, seeing: [], maps: {} });
+  const attention = useAttention(!!head);
+  const attentionOnRef = useRef(attention.on);
+  useEffect(() => {
+    attentionOnRef.current = attention.on;
+  }, [attention.on]);
   const [engineState, setEngineState] = useState<{ held: number; condition: boolean; cooling: boolean } | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
   const [notifyPermission, setNotifyPermission] = useState<NotificationPermission | "unsupported">("default");
@@ -266,14 +273,16 @@ export default function TriggersStep({
         // One reading per running camera, taken in turn through the same
         // canvas. The engine decides what several readings add up to.
         const readings: CameraReading[] = [];
+        const maps: Record<string, Float32Array> = {};
         for (const { uid } of camerasRef.current) {
           if (statusRef.current[uid] !== "running") continue;
           const video = videosRef.current.get(uid);
           if (!video || video.readyState < 2) continue;
           try {
             drawFrameForInference(video, canvas);
-            const scores = await predict(head, await embedCanvas(canvas));
-            readings.push({ cameraId: uid, score: scores[classIndex] });
+            const reading = await readFrame(head, canvas, attentionOnRef.current);
+            readings.push({ cameraId: uid, score: reading.probabilities[classIndex] });
+            if (reading.maps) maps[uid] = reading.maps[classIndex];
           } catch {
             /* one camera dropping a frame shouldn't cost the others theirs */
           }
@@ -283,7 +292,7 @@ export default function TriggersStep({
 
         const state = engine.update(readings, Date.now());
         setEngineState({ held: state.heldMs, condition: state.condition, cooling: state.cooling });
-        setLive({ scores: state.scores, seeing: state.seeing });
+        setLive({ scores: state.scores, seeing: state.seeing, maps });
         if (state.fired) {
           const seen = readings.filter((r) => state.seeing.includes(r.cameraId));
           const confidence = Math.max(...(seen.length ? seen : readings).map((r) => r.score));
@@ -299,7 +308,7 @@ export default function TriggersStep({
       if (timerRef.current !== null) window.clearInterval(timerRef.current);
       timerRef.current = null;
       engineRef.current = null;
-      setLive({ scores: {}, seeing: [] });
+      setLive({ scores: {}, seeing: [], maps: {} });
       setEngineState(null);
     };
     // `rule` is applied through setRule above; re-running here would restart the
@@ -619,6 +628,7 @@ export default function TriggersStep({
                 compact={cameras.length > 1}
                 score={live.scores[camera.uid] ?? null}
                 seeing={live.seeing.includes(camera.uid)}
+                attentionMap={attention.on ? (live.maps[camera.uid] ?? null) : null}
                 armed={armed}
                 onRemove={cameras.length > 1 ? removeCamera : undefined}
                 registerVideo={registerVideo}
@@ -691,6 +701,12 @@ export default function TriggersStep({
                       : "Waiting to see it."}
               </p>
             </div>
+
+            {attention.available && (
+              <div className="mt-4 border-t border-border pt-4">
+                <AttentionToggle on={attention.on} onToggle={attention.toggle} />
+              </div>
+            )}
 
             {log.length > 0 && (
               <ul className="mt-4 space-y-1.5 border-t border-border pt-4">
@@ -804,7 +820,7 @@ function Footer({ onBack }: { onBack: () => void }) {
         </div>
       </div>
       <p className="mt-3 text-xs leading-relaxed text-muted">
-        Next: saving detectors to an account, a shareable run link, and a standalone offline file.
+        Next: a shareable link that runs this detector on any device.
       </p>
     </div>
   );

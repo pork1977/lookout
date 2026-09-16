@@ -208,3 +208,136 @@ export async function predict(head: TrainedHead, embedding: Embedding): Promise<
 export function disposeHead(head: TrainedHead | null) {
   head?.model.dispose();
 }
+
+/**
+ * "What it's looking at": a class activation map, computed for free.
+ *
+ * MobileNet's embedding is the average of a 7x7 grid of 1280-number feature
+ * vectors, one per region of the frame (checked: the mean of that grid matches
+ * the model's own pooled output to within 5e-7). So instead of asking the
+ * model for the pooled vector, ask for the grid, average it ourselves for the
+ * normal prediction, and also run the head on each of the 49 regions on its
+ * own. A region the head scores highly for a group is a region that looks like
+ * that group. The head is tiny, so all 50 rows go through it in one call and
+ * the whole thing costs about the same as a plain prediction.
+ *
+ * The one fragile part is reaching the grid at all: it means running the
+ * pinned @tensorflow-models/mobilenet 2.1.1 graph by an internal node name. It
+ * is looked up rather than hardcoded, and if the lookup or the run ever fails,
+ * `attentionAvailable` goes false, the toggle hides, and predictions carry on
+ * through the ordinary path. Detection never depends on this.
+ */
+const POOL_NODE = "module_apply_default/MobilenetV2/Logits/AvgPool";
+const GRID = 7;
+
+interface SpatialGraph {
+  execute: (input: tfTypes.Tensor, outputs: string) => tfTypes.Tensor;
+  feeder: string;
+  scale: number;
+  offset: number;
+}
+
+let spatialGraph: SpatialGraph | null | undefined;
+
+function resolveSpatialGraph(extractor: MobileNet): SpatialGraph | null {
+  if (spatialGraph !== undefined) return spatialGraph;
+  try {
+    const impl = extractor as unknown as {
+      model?: {
+        execute?: (input: tfTypes.Tensor, outputs: string) => tfTypes.Tensor;
+        executor?: { graph?: { nodes?: Record<string, { inputs?: Array<{ name?: string }> }> } };
+      };
+      normalizationConstant?: number;
+      inputMin?: number;
+    };
+    const model = impl.model;
+    const feeder = model?.executor?.graph?.nodes?.[POOL_NODE]?.inputs?.[0]?.name;
+    spatialGraph =
+      model?.execute && feeder
+        ? {
+            execute: model.execute.bind(model),
+            feeder,
+            // Version 2 expects pixels in [-1, 1]; read the package's own
+            // values when they are there so the two paths can't drift apart.
+            scale: impl.normalizationConstant ?? 2 / 255,
+            offset: impl.inputMin ?? -1,
+          }
+        : null;
+  } catch {
+    spatialGraph = null;
+  }
+  return spatialGraph;
+}
+
+/** Whether the attention overlay can run in this browser with this model. */
+export async function attentionAvailable(): Promise<boolean> {
+  try {
+    return resolveSpatialGraph(await loadExtractor()) !== null;
+  } catch {
+    return false;
+  }
+}
+
+export interface FrameReading {
+  /** Probability per class, identical to predict(head, embedCanvas(canvas)). */
+  probabilities: number[];
+  /**
+   * Per class, a 7x7 grid (row by row, in the canvas's own orientation) of how
+   * strongly each region reads as that class. Null when not asked for or not
+   * available.
+   */
+  maps: Float32Array[] | null;
+}
+
+/**
+ * Reads one frame drawn by drawFrameForInference. With `withAttention`, also
+ * returns the per-region maps described above, at no extra MobileNet cost.
+ */
+export async function readFrame(
+  head: TrainedHead,
+  canvas: HTMLCanvasElement,
+  withAttention: boolean,
+): Promise<FrameReading> {
+  const extractor = await loadExtractor();
+  const graph = withAttention ? resolveSpatialGraph(extractor) : null;
+  if (!graph) {
+    return { probabilities: await predict(head, await embedCanvas(canvas)), maps: null };
+  }
+
+  const tf = await getTf();
+  let output: tfTypes.Tensor;
+  try {
+    output = tf.tidy(() => {
+      const pixels = tf.browser.fromPixels(canvas);
+      let normalized = tf.add(tf.mul(tf.cast(pixels, "float32"), graph.scale), graph.offset);
+      if (pixels.shape[0] !== 224 || pixels.shape[1] !== 224) {
+        normalized = tf.image.resizeBilinear(normalized as tfTypes.Tensor3D, [224, 224], true);
+      }
+      const batched = tf.reshape(normalized, [1, 224, 224, 3]);
+      const spatial = graph.execute(batched, graph.feeder);
+      const depth = spatial.shape[3] as number;
+      const pooled = tf.reshape(tf.mean(spatial, [1, 2]), [1, depth]);
+      const regions = tf.reshape(spatial, [GRID * GRID, depth]);
+      return head.model.predict(tf.concat([pooled, regions], 0)) as tfTypes.Tensor;
+    });
+  } catch {
+    // Something about the graph didn't hold. Stop trying for the rest of the
+    // session and answer this frame the ordinary way.
+    spatialGraph = null;
+    return { probabilities: await predict(head, await embedCanvas(canvas)), maps: null };
+  }
+
+  try {
+    const data = (await output.data()) as Float32Array;
+    const classCount = head.classIds.length;
+    const probabilities = Array.from(data.subarray(0, classCount));
+    const maps = Array.from({ length: classCount }, (_, k) => {
+      const map = new Float32Array(GRID * GRID);
+      for (let cell = 0; cell < map.length; cell++) map[cell] = data[(cell + 1) * classCount + k];
+      return map;
+    });
+    return { probabilities, maps };
+  } finally {
+    output.dispose();
+  }
+}
