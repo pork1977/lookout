@@ -18,6 +18,7 @@ export default function ExamplesStep({
   onDeleteExample,
   onMoveExample,
   onBack,
+  onContinue,
 }: {
   classes: DetectorClass[];
   activeClassId: string;
@@ -27,6 +28,7 @@ export default function ExamplesStep({
   onDeleteExample: (classId: string, exampleId: string) => void;
   onMoveExample: (fromClassId: string, exampleId: string, toClassId: string) => void;
   onBack: () => void;
+  onContinue: () => void;
 }) {
   const active = classes.find((c) => c.id === activeClassId) ?? classes[0];
   const short = classes.filter((c) => c.examples.length < MIN_PER_CLASS);
@@ -84,28 +86,30 @@ export default function ExamplesStep({
             >
               Back
             </button>
-            {/* Deliberately not a dimmed primary button. As one, it read as
-                "you haven't met some condition" when the real answer is that
-                this step doesn't exist yet. */}
-            <div className="flex items-center gap-2 rounded-full border border-dashed border-border-strong px-4 py-2">
-              <span className="text-sm font-medium text-muted">Review &amp; label</span>
-              <span className="rounded-full bg-surface-raised px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-accent">
-                Being built
-              </span>
-            </div>
+            <button
+              onClick={onContinue}
+              disabled={short.length > 0}
+              className="rounded-full px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_10px_30px_-8px_var(--glow)] transition-transform hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:hover:scale-100"
+              style={{
+                backgroundImage: "linear-gradient(135deg, var(--accent), var(--accent-strong))",
+              }}
+            >
+              Review &amp; label
+            </button>
           </div>
           <p className="mt-3 text-xs leading-relaxed text-muted">
-            Your photos are ready
             {short.length > 0 ? (
               <>
-                {" "}
-                — though {short.map((c) => `"${c.name || "Untitled group"}"`).join(" and ")} still
+                {short.map((c) => `"${c.name || "Untitled group"}"`).join(" and ")} still
                 {short.length === 1 ? " needs" : " need"} at least {MIN_PER_CLASS} photos before
-                training would be worth much
+                the next step is worth running.
               </>
-            ) : null}
-            . The next step, where Claude proposes a label for each photo and you only review the
-            uncertain ones, is what&apos;s being built now.
+            ) : (
+              <>
+                Next, Claude looks at each photo and says which group it belongs in — you only
+                review the ones it isn&apos;t sure about.
+              </>
+            )}
           </p>
         </div>
       </div>
