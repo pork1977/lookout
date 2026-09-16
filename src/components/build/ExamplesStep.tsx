@@ -170,8 +170,11 @@ function ClassBucket({
         />
       </div>
 
+      {/* 72px cells couldn't fit "Move to…" plus a native select arrow, so the
+          label clipped. The overlay controls set the floor here, not the
+          thumbnail. */}
       {count > 0 && (
-        <ul className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-2">
+        <ul className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-2">
           {cls.examples.map((example) => (
             <Thumbnail
               key={example.id}
@@ -205,19 +208,31 @@ function Thumbnail({
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={example.url} alt="" className="h-full w-full object-cover" />
 
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-background/80 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+      <div className="absolute inset-0 flex flex-col items-stretch justify-center gap-1.5 bg-background/80 p-2 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 focus-within:opacity-100">
         <button
           onClick={onDelete}
-          className="rounded-full bg-surface px-2 py-1 text-[10px] font-medium text-foreground hover:bg-surface-raised"
+          className="w-full rounded-full bg-surface px-2 py-1.5 text-[11px] font-medium text-foreground hover:bg-surface-raised"
         >
           Delete
         </button>
-        {otherClasses.length > 0 && (
+
+        {/* With the usual two groups there's only one place to move to, so a
+            plain button beats a dropdown whose own label is the widest thing
+            in it. The select is kept for the three-or-more case. */}
+        {otherClasses.length === 1 ? (
+          <button
+            onClick={() => onMove(otherClasses[0].id)}
+            title={`Move to "${otherClasses[0].name || "Untitled group"}"`}
+            className="w-full truncate rounded-full bg-surface px-2 py-1.5 text-[11px] font-medium text-foreground hover:bg-surface-raised"
+          >
+            Move
+          </button>
+        ) : otherClasses.length > 1 ? (
           <select
             value=""
             onChange={(e) => e.target.value && onMove(e.target.value)}
             aria-label="Move to another group"
-            className="max-w-[90%] rounded-full bg-surface px-2 py-1 text-[10px] text-foreground outline-none"
+            className="w-full rounded-full bg-surface px-2 py-1.5 text-[11px] text-foreground outline-none"
           >
             <option value="">Move to…</option>
             {otherClasses.map((c) => (
@@ -226,7 +241,7 @@ function Thumbnail({
               </option>
             ))}
           </select>
-        )}
+        ) : null}
       </div>
     </li>
   );
