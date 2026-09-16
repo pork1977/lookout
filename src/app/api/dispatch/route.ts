@@ -27,11 +27,25 @@ interface DispatchBody {
   confidence?: number;
 }
 
+/**
+ * Which email provider is configured, if any.
+ *
+ * Two different services with different endpoints, auth headers and body
+ * shapes — a Brevo key in RESEND_API_KEY authenticates against nothing, so the
+ * variable name is what selects the provider.
+ */
+function emailProvider(): "resend" | "brevo" | null {
+  if (process.env.BREVO_API_KEY) return "brevo";
+  if (process.env.RESEND_API_KEY) return "resend";
+  return null;
+}
+
 export function GET() {
   return NextResponse.json({
     webhooks: true,
     // Email needs a provider; the others only need the user's own URL.
-    email: !!process.env.RESEND_API_KEY,
+    email: !!emailProvider(),
+    emailProvider: emailProvider(),
   });
 }
 
@@ -127,8 +141,8 @@ async function postJson(target: string, payload: unknown) {
 }
 
 async function sendEmail(body: DispatchBody) {
-  const key = process.env.RESEND_API_KEY;
-  if (!key) {
+  const provider = emailProvider();
+  if (!provider) {
     return NextResponse.json(
       { error: "Email isn't configured on this deployment." },
       { status: 503 },
@@ -138,22 +152,60 @@ async function sendEmail(body: DispatchBody) {
     return NextResponse.json({ error: "That doesn't look like an email address." }, { status: 400 });
   }
 
+  const subject = body.detectorName ? `${body.detectorName} saw something` : "Lookout alert";
+  const fromAddress = process.env.EMAIL_FROM ?? "onboarding@resend.dev";
+
+  const request: { url: string; headers: Record<string, string>; body: unknown } =
+    provider === "brevo"
+      ? {
+          url: "https://api.brevo.com/v3/smtp/email",
+          // Brevo authenticates with its own header, not a bearer token.
+          headers: {
+            "api-key": process.env.BREVO_API_KEY as string,
+            "Content-Type": "application/json",
+            accept: "application/json",
+          },
+          body: {
+            sender: { email: fromAddress, name: "Lookout" },
+            to: [{ email: body.target }],
+            subject,
+            textContent: body.message,
+          },
+        }
+      : {
+          url: "https://api.resend.com/emails",
+          headers: {
+            Authorization: `Bearer ${process.env.RESEND_API_KEY as string}`,
+            "Content-Type": "application/json",
+          },
+          body: {
+            from: `Lookout <${fromAddress}>`,
+            to: [body.target],
+            subject,
+            text: body.message,
+          },
+        };
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const response = await fetch("https://api.resend.com/emails", {
+    const response = await fetch(request.url, {
       method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: process.env.RESEND_FROM ?? "Lookout <onboarding@resend.dev>",
-        to: [body.target],
-        subject: body.detectorName ? `${body.detectorName} saw something` : "Lookout alert",
-        text: body.message,
-      }),
+      headers: request.headers,
+      body: JSON.stringify(request.body),
       signal: controller.signal,
     });
     if (!response.ok) {
-      return NextResponse.json({ error: "The email provider rejected that." }, { status: 502 });
+      // The provider's own reason is the useful part here — a wrong key or an
+      // unverified sender address both come back as a plain 401/403 otherwise.
+      const detail = await response.text().catch(() => "");
+      return NextResponse.json(
+        {
+          error: `${provider} rejected that (${response.status}).`,
+          detail: detail.slice(0, 200) || undefined,
+        },
+        { status: 502 },
+      );
     }
     return NextResponse.json({ ok: true });
   } catch {

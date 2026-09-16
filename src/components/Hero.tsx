@@ -7,17 +7,18 @@ export default function Hero() {
   return (
     <section
       id="demo"
-      className="relative scroll-mt-24 overflow-hidden border-b border-border py-20 sm:py-28"
+      className="relative scroll-mt-24 border-b border-border py-20 sm:py-28"
     >
-      <div
-        className="ambient-glow -left-40 -top-40 h-[420px] w-[420px]"
-        aria-hidden
-      />
-      <div
-        className="ambient-glow -right-32 top-1/3 h-[360px] w-[360px]"
-        style={{ background: "radial-gradient(closest-side, var(--accent-strong), transparent 70%)" }}
-        aria-hidden
-      />
+      {/* The glows are what needed clipping, not the section. With
+          overflow-hidden on the section itself, the camera picker's dropdown was
+          cut off at the section boundary on small screens. */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+        <div className="ambient-glow -left-40 -top-40 h-[420px] w-[420px]" />
+        <div
+          className="ambient-glow -right-32 top-1/3 h-[360px] w-[360px]"
+          style={{ background: "radial-gradient(closest-side, var(--accent-strong), transparent 70%)" }}
+        />
+      </div>
       <div className="relative mx-auto grid max-w-6xl gap-16 px-6 lg:grid-cols-2 lg:items-center">
         <div>
           <span className="inline-flex items-center gap-2 rounded-full border border-border-strong px-3 py-1 text-xs font-medium text-muted">

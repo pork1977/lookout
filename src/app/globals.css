@@ -268,3 +268,26 @@ body {
     animation: none;
   }
 }
+
+/* Alert toast. Fixed rather than inline: an alert rendered at the top of a long
+   page is an alert nobody scrolled up to see. */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.animate-toast-in {
+  animation: toast-in 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-toast-in {
+    animation: none;
+  }
+}

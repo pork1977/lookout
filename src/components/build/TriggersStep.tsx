@@ -11,14 +11,19 @@ import {
   type TriggerRule,
 } from "@/lib/triggerEngine";
 import {
+  DEFAULT_SPEECH,
   dispatch,
   notificationPermission,
   notify,
+  pickDefaultVoice,
   renderMessage,
   requestNotificationPermission,
   speak,
+  speechSupported,
+  subscribeToVoices,
   type ClientActionId,
   type ServerActionId,
+  type SpeechOptions,
 } from "@/lib/triggerActions";
 import ProgressBar from "./ProgressBar";
 import type { DetectorClass } from "./types";
@@ -60,6 +65,9 @@ export default function TriggersStep({
   const [cameraState, setCameraState] = useState<"idle" | "starting" | "running" | "denied" | "busy">("idle");
   const [engineState, setEngineState] = useState<{ held: number; condition: boolean; cooling: boolean } | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
+  const [notifyPermission, setNotifyPermission] = useState<NotificationPermission | "unsupported">("default");
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [speech, setSpeech] = useState<SpeechOptions>({ ...DEFAULT_SPEECH });
   const [log, setLog] = useState<Array<{ at: string; text: string; error?: string }>>([]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -69,6 +77,16 @@ export default function TriggersStep({
   const busyRef = useRef(false);
   const engineRef = useRef<TriggerEngine | null>(null);
   const bannerTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    // Notification.permission has no synchronous value that is safe to read
+    // during SSR and no change event to subscribe to, so reading it once on
+    // mount really is the only option here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNotifyPermission(notificationPermission());
+  }, []);
+
+  useEffect(() => subscribeToVoices(setVoices), []);
 
   useEffect(() => {
     fetch("/api/dispatch")
@@ -101,7 +119,7 @@ export default function TriggersStep({
       const at = new Date().toLocaleTimeString();
       setLog((prev) => [{ at, text: message }, ...prev].slice(0, 8));
 
-      if (clientActions.has("speak")) speak(message);
+      if (clientActions.has("speak")) speak(message, speech);
       if (clientActions.has("notify")) notify(detectorName || "Lookout", message);
       if (clientActions.has("banner")) {
         setBanner(message);
@@ -124,9 +142,12 @@ export default function TriggersStep({
         }
       }
     },
-    [classes, classIndex, template, clientActions, serverTargets, detectorName],
+    [classes, classIndex, template, clientActions, serverTargets, detectorName, speech],
   );
 
+  // The prediction loop calls fireRef.current, never `fire` directly, so `fire`
+  // is free to be rebuilt whenever its inputs change — including the voice
+  // settings — without disturbing the loop or the dwell clock.
   const fireRef = useRef(fire);
   useEffect(() => {
     fireRef.current = fire;
@@ -193,6 +214,9 @@ export default function TriggersStep({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [armed, cameraState, head, classIndex, classId]);
 
+  const activeClassName = classes[classIndex]?.name || "Untitled group";
+  const previewMessage = renderMessage(template, activeClassName, 0.92);
+
   const dwellProgress = engineState
     ? Math.min(1, engineState.held / Math.max(1, rule.dwellSeconds * 1000))
     : 0;
@@ -216,8 +240,10 @@ export default function TriggersStep({
     <div className="space-y-5">
       {banner && (
         <div
-          className="glow-ring rounded-2xl border border-border-strong bg-surface px-5 py-4 text-sm font-medium text-foreground"
+          className="animate-toast-in glow-ring fixed left-1/2 top-6 z-50 max-w-[min(90vw,32rem)] rounded-2xl border border-border-strong bg-surface px-5 py-4 text-sm font-medium text-foreground shadow-2xl"
+          style={{ transform: "translateX(-50%)" }}
           role="status"
+          aria-live="polite"
         >
           {banner}
         </div>
@@ -311,12 +337,25 @@ export default function TriggersStep({
                       type="checkbox"
                       checked={on}
                       onChange={async (e) => {
-                        if (e.target.checked && action.id === "notify") {
-                          await requestNotificationPermission();
+                        // Captured before the await: this is a controlled input,
+                        // so React repaints it back to its state value while the
+                        // permission prompt is open, and reading e.target.checked
+                        // afterwards always came back false — which is why the
+                        // box never stayed ticked.
+                        const wanted = e.target.checked;
+                        if (wanted && action.id === "notify") {
+                          const permission = await requestNotificationPermission();
+                          // Ticking a box that can't do anything is worse than
+                          // not ticking it.
+                          if (permission !== "granted") {
+                            setNotifyPermission(permission);
+                            return;
+                          }
+                          setNotifyPermission(permission);
                         }
                         setClientActions((prev) => {
                           const next = new Set(prev);
-                          if (e.target.checked) next.add(action.id);
+                          if (wanted) next.add(action.id);
                           else next.delete(action.id);
                           return next;
                         });
@@ -327,8 +366,11 @@ export default function TriggersStep({
                       <span className="block text-sm text-foreground">{action.label}</span>
                       <span className="block text-xs text-muted">
                         {action.blurb}
-                        {action.id === "notify" && notificationPermission() === "denied" && (
+                        {action.id === "notify" && notifyPermission === "denied" && (
                           <span className="text-foreground"> · blocked in this browser</span>
+                        )}
+                        {action.id === "notify" && notifyPermission === "unsupported" && (
+                          <span className="text-foreground"> · not supported here</span>
                         )}
                       </span>
                     </span>
@@ -368,12 +410,88 @@ export default function TriggersStep({
                 onChange={(e) => setTemplate(e.target.value)}
                 className="mt-1.5 w-full rounded-xl border border-border-strong bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-accent"
               />
+              <dl className="mt-3 space-y-1.5 text-xs">
+                <div className="flex gap-2">
+                  <dt className="shrink-0">
+                    <code className="rounded bg-surface-raised px-1 py-0.5 text-accent">
+                      {"{what}"}
+                    </code>
+                  </dt>
+                  <dd className="text-muted">
+                    the group it saw &mdash; right now that is{" "}
+                    <span className="text-foreground">
+                      &ldquo;{activeClassName}&rdquo;
+                    </span>
+                  </dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="shrink-0">
+                    <code className="rounded bg-surface-raised px-1 py-0.5 text-accent">
+                      {"{confidence}"}
+                    </code>
+                  </dt>
+                  <dd className="text-muted">
+                    how sure it was, as a percentage &mdash;{" "}
+                    <span className="text-foreground">&ldquo;92%&rdquo;</span>
+                  </dd>
+                </div>
+              </dl>
+              {/* The brackets in the default are just punctuation, which was not
+                  obvious from the field alone. A worked example says it better
+                  than a sentence can. */}
+              <p className="mt-3 rounded-xl bg-surface-raised px-3 py-2 text-xs text-muted">
+                Reads out as:{" "}
+                <span className="text-foreground">&ldquo;{previewMessage}&rdquo;</span>
+              </p>
               <p className="mt-1.5 text-xs text-muted">
-                <code className="rounded bg-surface-raised px-1 py-0.5">{"{what}"}</code> and{" "}
-                <code className="rounded bg-surface-raised px-1 py-0.5">{"{confidence}"}</code> get
-                filled in.
+                The round brackets are ordinary text &mdash; delete them if you would rather it
+                just said &ldquo;{activeClassName} 92%&rdquo;.
               </p>
             </div>
+
+            {clientActions.has("speak") && speechSupported() && (
+              <div className="mt-5 border-t border-border pt-5">
+                <span className="text-xs font-medium text-foreground">Voice</span>
+                <select
+                  value={speech.voiceURI ?? pickDefaultVoice(voices)?.voiceURI ?? ""}
+                  onChange={(e) => setSpeech((prev) => ({ ...prev, voiceURI: e.target.value }))}
+                  className="mt-1.5 w-full rounded-xl border border-border-strong bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-accent"
+                >
+                  {voices.length === 0 && <option value="">Loading voices…</option>}
+                  {voices.map((voice) => (
+                    <option key={voice.voiceURI} value={voice.voiceURI}>
+                      {voice.name} ({voice.lang}){voice.localService ? "" : " · cloud"}
+                    </option>
+                  ))}
+                </select>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <RangeField
+                    label="Speed"
+                    value={speech.rate ?? 1}
+                    min={0.6}
+                    max={1.4}
+                    onChange={(rate) => setSpeech((prev) => ({ ...prev, rate }))}
+                  />
+                  <RangeField
+                    label="Pitch"
+                    value={speech.pitch ?? 1}
+                    min={0.6}
+                    max={1.4}
+                    onChange={(pitch) => setSpeech((prev) => ({ ...prev, pitch }))}
+                  />
+                </div>
+                <button
+                  onClick={() => speak(previewMessage, speech)}
+                  className="mt-3 rounded-full border border-border-strong px-4 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-surface-raised"
+                >
+                  Hear it
+                </button>
+                <p className="mt-2 text-xs leading-relaxed text-muted">
+                  Voices come from your own device and browser, with no service involved. The ones
+                  marked cloud usually sound the most natural.
+                </p>
+              </div>
+            )}
           </section>
         </div>
 
@@ -458,6 +576,38 @@ export default function TriggersStep({
       </div>
 
       <Footer onBack={onBack} />
+    </div>
+  );
+}
+
+function RangeField({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <label className="text-xs text-muted">{label}</label>
+        <span className="font-mono text-xs text-muted">{value.toFixed(2)}&times;</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={0.05}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="mt-1 w-full accent-[var(--accent)]"
+      />
     </div>
   );
 }
