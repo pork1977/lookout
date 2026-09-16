@@ -88,17 +88,23 @@ export default function AccountPanel({
           className="h-1.5 w-1.5 rounded-full"
           style={{ background: user ? "var(--accent)" : "var(--muted)" }}
         />
-        {user ? "Account" : "Sign in"}
+        {/* "Sign in" hid the sign-up behind a label that reads as
+            existing-users-only, which is exactly how it got missed. "Account"
+            covers both, and the dot carries the signed-in state. */}
+        Account
       </button>
 
       {open && (
         <div className="absolute right-0 top-10 z-40 w-80 rounded-2xl border border-border-strong bg-surface p-4 shadow-2xl">
           {!user ? (
             <>
-              <h3 className="text-sm font-semibold text-foreground">Save to an account</h3>
+              <h3 className="text-sm font-semibold text-foreground">
+                Create an account, or sign in
+              </h3>
               <p className="mt-1.5 text-xs leading-relaxed text-muted">
                 Optional. Your detectors already live in this browser — an account is for backing
-                them up and pulling them onto another machine.
+                them up and pulling them onto another machine. New here? Fill both fields and
+                choose <span className="text-foreground">Create account</span>.
               </p>
               <div className="mt-4 space-y-2">
                 <input
