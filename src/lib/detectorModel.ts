@@ -61,7 +61,13 @@ export function startDetector(): Promise<void> {
     void cocoSsd
       .load({ base: "mobilenet_v2" })
       .then((model) => {
+        const previous = fast;
         accurate = model;
+        // Free the warm-up model's tensors, but only behind the queue: calls
+        // enqueued before this line are still holding it, calls enqueued after
+        // already read `accurate`. Skipping this left both models resident in
+        // GPU memory for the whole session.
+        tail = tail.then(() => previous?.dispose()).catch(() => undefined);
       })
       .catch(() => {
         /* stay on the fast base; detection still works */
