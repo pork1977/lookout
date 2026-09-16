@@ -149,13 +149,12 @@ export default function AccountPanel({
                         email,
                         password,
                         options: {
-                          // Without this Supabase falls back to the project's
-                          // Site URL, which is localhost:3000 by default — so a
-                          // confirmation mail sent from production pointed at a
-                          // machine that wasn't running. Deriving it from the
-                          // current origin means the link comes back wherever
-                          // you actually signed up.
-                          emailRedirectTo: `${window.location.origin}/build`,
+                          // Must match an entry in Supabase's redirect allow
+                          // list or it's rejected and silently falls back to the
+                          // project's Site URL. Derived from the current origin
+                          // so a sign-up on production returns to production and
+                          // one on localhost returns to localhost.
+                          emailRedirectTo: `${window.location.origin}/auth/callback`,
                         },
                       });
                       if (error) throw new Error(error.message);
