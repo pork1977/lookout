@@ -20,6 +20,13 @@ const MAX_CAMERAS = 4;
 interface CameraSlot {
   uid: string;
   deviceId?: string;
+  /**
+   * Overrides the default "everything after the first tile starts itself".
+   * Set when the user fills the untouched primary slot from the picker, which
+   * is an explicit enough choice to start on, and means it behaves like the
+   * sibling tiles it was picked alongside rather than sitting on a button.
+   */
+  autoStart?: boolean;
 }
 
 export default function LiveDemo() {
@@ -104,6 +111,16 @@ export default function LiveDemo() {
         return prev.length > 1 ? prev.filter((s) => s.deviceId !== deviceId) : prev;
       }
       if (prev.length >= MAX_CAMERAS) return prev;
+
+      // The primary slot exists from page load with no device attached. Always
+      // appending meant picking three cameras before ever starting one left an
+      // empty fourth tile sitting beside them — so fill that slot first.
+      const vacant = prev.findIndex((s) => !s.deviceId);
+      if (vacant !== -1) {
+        const next = [...prev];
+        next[vacant] = { ...next[vacant], deviceId, autoStart: true };
+        return next;
+      }
       return [...prev, { uid, deviceId }];
     });
     nextUid.current += 1;
@@ -264,7 +281,7 @@ export default function LiveDemo() {
                     cameraLabel={labelFor(slot.deviceId, i)}
                     color={colorFor(i)}
                     compact={grid}
-                    autoStart={i > 0}
+                    autoStart={slot.autoStart ?? i > 0}
                     showBadgeNumbers={expanded}
                     onDetections={handleDetections}
                     onStart={i === 0 ? handlePrimaryStart : undefined}
