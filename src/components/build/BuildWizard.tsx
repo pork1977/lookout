@@ -5,13 +5,15 @@ import DescribeStep from "./DescribeStep";
 import ExamplesStep from "./ExamplesStep";
 import ReviewStep from "./ReviewStep";
 import TrainStep from "./TrainStep";
+import TriggersStep from "./TriggersStep";
 import { MAX_CLASSES, MIN_CLASSES, type DetectorClass, type ExampleImage } from "./types";
+import { disposeHead, type TrainedHead } from "@/lib/trainer";
 import type { Preset } from "@/lib/presets";
 
 const STEPS = ["Describe", "Examples", "Review & label", "Train", "Triggers", "Deploy"] as const;
 
 /** Built so far. The rest are laid out greyed so the shape of the flow is visible. */
-const LIVE_STEPS = 4;
+const LIVE_STEPS = 5;
 
 export default function BuildWizard() {
   const [step, setStep] = useState(0);
@@ -24,7 +26,23 @@ export default function BuildWizard() {
     { id: "class-b", name: "", examples: [] },
   ]);
   const [activeClassId, setActiveClassId] = useState("class-a");
+  /**
+   * The trained model lives here rather than in the training step, because the
+   * triggers step needs it and navigating between the two unmounts one of them.
+   */
+  const [head, setHead] = useState<TrainedHead | null>(null);
+  const headRef = useRef<TrainedHead | null>(null);
   const nextId = useRef(0);
+
+  const adoptHead = useCallback((next: TrainedHead) => {
+    // A retrain replaces the model; freeing the old one keeps its weights from
+    // sitting on the GPU for the rest of the session.
+    disposeHead(headRef.current);
+    headRef.current = next;
+    setHead(next);
+  }, []);
+
+  useEffect(() => () => disposeHead(headRef.current), []);
 
   const newId = useCallback((prefix: string) => {
     nextId.current += 1;
@@ -214,8 +232,21 @@ export default function BuildWizard() {
           onBack={() => setStep(1)}
           onContinue={() => setStep(3)}
         />
+      ) : step === 3 ? (
+        <TrainStep
+          classes={classes}
+          head={head}
+          onTrained={adoptHead}
+          onBack={() => setStep(2)}
+          onContinue={() => setStep(4)}
+        />
       ) : (
-        <TrainStep classes={classes} onBack={() => setStep(2)} />
+        <TriggersStep
+          classes={classes}
+          head={head}
+          detectorName={description || "Lookout"}
+          onBack={() => setStep(3)}
+        />
       )}
 
       {/* Persistence is Phase G. Saying so here beats letting someone lose

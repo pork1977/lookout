@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { classifyCameraError, openCameraStream } from "@/lib/cameraStream";
 import { drawFrameForInference } from "@/lib/imageCapture";
 import {
-  disposeHead,
   embedBlob,
   embedCanvas,
   loadExtractor,
@@ -24,16 +23,24 @@ const PREDICT_INTERVAL_MS = 120;
 
 export default function TrainStep({
   classes,
+  head,
+  onTrained,
   onBack,
+  onContinue,
 }: {
   classes: DetectorClass[];
+  /** Owned by the wizard, because the triggers step needs it after this one unmounts. */
+  head: TrainedHead | null;
+  onTrained: (head: TrainedHead) => void;
   onBack: () => void;
+  onContinue: () => void;
 }) {
-  const [phase, setPhase] = useState<Phase>("idle");
+  // Coming back to this step with a model already trained should show it, not
+  // offer to start over.
+  const [phase, setPhase] = useState<Phase>(head ? "trained" : "idle");
   const [prepared, setPrepared] = useState({ done: 0, total: 0 });
   const [epoch, setEpoch] = useState<EpochProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [head, setHead] = useState<TrainedHead | null>(null);
 
   const [cameraState, setCameraState] = useState<"idle" | "starting" | "running" | "denied" | "busy">(
     "idle",
@@ -45,15 +52,10 @@ export default function TrainStep({
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<number | null>(null);
   const busyRef = useRef(false);
-  const headRef = useRef<TrainedHead | null>(null);
 
   // Embeddings are keyed by example id so a retrain after adding a few photos
   // only pays for the new ones — the whole point of freezing the extractor.
   const embeddingCacheRef = useRef<Map<string, Float32Array>>(new Map());
-
-  useEffect(() => {
-    headRef.current = head;
-  }, [head]);
 
   const stopCamera = useCallback(() => {
     if (timerRef.current !== null) window.clearInterval(timerRef.current);
@@ -62,13 +64,10 @@ export default function TrainStep({
     streamRef.current = null;
   }, []);
 
-  useEffect(
-    () => () => {
-      stopCamera();
-      disposeHead(headRef.current);
-    },
-    [stopCamera],
-  );
+  // Only the camera is torn down here. The trained head deliberately survives
+  // this component: leaving for the triggers step unmounts it, and disposing
+  // the model on the way out would hand the next step an empty tensor.
+  useEffect(() => () => stopCamera(), [stopCamera]);
 
   const train = useCallback(async () => {
     setError(null);
@@ -98,23 +97,19 @@ export default function TrainStep({
       }
 
       setPhase("training");
-      // Replacing a previous head: free the old one or its weights stay on the
-      // GPU for the rest of the session, every retrain.
-      disposeHead(headRef.current);
-      setHead(null);
-
       const trained = await trainHead(
         samples,
         classes.map((c) => c.id),
         setEpoch,
       );
-      setHead(trained);
+      // The wizard owns the head, and disposes whichever one this replaces.
+      onTrained(trained);
       setPhase("trained");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Training failed.");
       setPhase("error");
     }
-  }, [classes]);
+  }, [classes, onTrained]);
 
   const startCamera = useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) return;
@@ -377,16 +372,21 @@ export default function TrainStep({
           >
             Back
           </button>
-          <div className="flex items-center gap-2 rounded-full border border-dashed border-border-strong px-4 py-2">
-            <span className="text-sm font-medium text-muted">Triggers</span>
-            <span className="rounded-full bg-surface-raised px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-accent">
-              Being built
-            </span>
-          </div>
+          <button
+            onClick={onContinue}
+            disabled={!head}
+            className="rounded-full px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_10px_30px_-8px_var(--glow)] transition-transform hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:hover:scale-100"
+            style={{
+              backgroundImage: "linear-gradient(135deg, var(--accent), var(--accent-strong))",
+            }}
+          >
+            Set up triggers
+          </button>
         </div>
         <p className="mt-3 text-xs leading-relaxed text-muted">
-          Next comes the trigger library — speak, notify, banner, Slack, Discord, webhook or email
-          the moment it sees what you trained it on.
+          {head
+            ? "Next: decide what happens when it sees something — speak, notify, banner, Slack, Discord, webhook or email."
+            : "Train it first, then you can decide what happens when it sees something."}
         </p>
       </div>
     </div>

@@ -32,29 +32,38 @@ export interface QuotaDecision {
   retryAfterSeconds: number;
 }
 
-export function consumeImageQuota(key: string, images: number): QuotaDecision {
+function consume(key: string, amount: number, limit: number, windowMs: number): QuotaDecision {
   const now = Date.now();
   prune(now);
 
   const existing = buckets.get(key);
-  const bucket = existing && existing.resetAt > now ? existing : { used: 0, resetAt: now + WINDOW_MS };
+  const bucket = existing && existing.resetAt > now ? existing : { used: 0, resetAt: now + windowMs };
 
-  if (bucket.used + images > IMAGES_PER_WINDOW) {
+  if (bucket.used + amount > limit) {
     buckets.set(key, bucket);
     return {
       ok: false,
-      remaining: Math.max(0, IMAGES_PER_WINDOW - bucket.used),
+      remaining: Math.max(0, limit - bucket.used),
       retryAfterSeconds: Math.ceil((bucket.resetAt - now) / 1000),
     };
   }
 
-  bucket.used += images;
+  bucket.used += amount;
   buckets.set(key, bucket);
-  return {
-    ok: true,
-    remaining: IMAGES_PER_WINDOW - bucket.used,
-    retryAfterSeconds: 0,
-  };
+  return { ok: true, remaining: limit - bucket.used, retryAfterSeconds: 0 };
+}
+
+export function consumeImageQuota(key: string, images: number): QuotaDecision {
+  return consume(`img:${key}`, images, IMAGES_PER_WINDOW, WINDOW_MS);
+}
+
+/**
+ * Dispatches are cheap for us but not for whoever is on the other end of the
+ * webhook, so this is as much about not making the app a convenient way to
+ * flood someone else's endpoint as about our own costs.
+ */
+export function consumeDispatchQuota(key: string): QuotaDecision {
+  return consume(`disp:${key}`, 1, 60, 5 * 60 * 1000);
 }
 
 /**
