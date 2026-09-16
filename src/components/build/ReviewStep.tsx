@@ -34,12 +34,14 @@ export default function ReviewStep({
   onMoveExample,
   onDeleteExample,
   onBack,
+  onContinue,
 }: {
   description: string;
   classes: DetectorClass[];
   onMoveExample: (fromClassId: string, exampleId: string, toClassId: string) => void;
   onDeleteExample: (classId: string, exampleId: string) => void;
   onBack: () => void;
+  onContinue: () => void;
 }) {
   const [availability, setAvailability] = useState<LabelAvailability | null>(null);
   const [state, setState] = useState<RunState>("idle");
@@ -174,7 +176,7 @@ export default function ReviewStep({
             in, which is all training needs.
           </p>
         </div>
-        <Footer onBack={onBack} />
+        <Footer onBack={onBack} onContinue={onContinue} />
       </div>
     );
   }
@@ -334,12 +336,12 @@ export default function ReviewStep({
         </>
       )}
 
-      <Footer onBack={onBack} />
+      <Footer onBack={onBack} onContinue={onContinue} />
     </div>
   );
 }
 
-function Footer({ onBack }: { onBack: () => void }) {
+function Footer({ onBack, onContinue }: { onBack: () => void; onContinue: () => void }) {
   return (
     <div className="rounded-2xl border border-border bg-surface p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -349,16 +351,19 @@ function Footer({ onBack }: { onBack: () => void }) {
         >
           Back
         </button>
-        <div className="flex items-center gap-2 rounded-full border border-dashed border-border-strong px-4 py-2">
-          <span className="text-sm font-medium text-muted">Train</span>
-          <span className="rounded-full bg-surface-raised px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-accent">
-            Being built
-          </span>
-        </div>
+        <button
+          onClick={onContinue}
+          className="rounded-full px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_10px_30px_-8px_var(--glow)] transition-transform hover:scale-[1.02]"
+          style={{
+            backgroundImage: "linear-gradient(135deg, var(--accent), var(--accent-strong))",
+          }}
+        >
+          Train
+        </button>
       </div>
       <p className="mt-3 text-xs leading-relaxed text-muted">
-        Next comes training — transfer learning on a frozen MobileNet, running in this tab, taking
-        seconds rather than a queued job.
+        Training runs in this tab and takes seconds — a pretrained vision model does the heavy
+        lifting, and only a small classifier on top actually learns your groups.
       </p>
     </div>
   );

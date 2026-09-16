@@ -13,8 +13,8 @@ const BURST_INTERVAL_MS = 160;
 /**
  * Cameras spend their first moments hunting for exposure and white balance —
  * the frames that look washed out or green-tinted. Capture is held until that
- * settles, because the real cost of those frames isn't how they look, it's them
- * ending up in the training set.
+ * settles. This matters more where a camera is genuinely misbehaving: the cost
+ * of those frames isn't how they look, it's them ending up in the training set.
  */
 const SETTLE_MS = 700;
 
@@ -75,21 +75,18 @@ export default function CapturePanel({
       setState("starting");
       stopCamera();
       try {
-        // Nothing beyond the device itself.
+        // Minimal constraints on purpose. Every capture is centre-cropped and
+        // downscaled to 320px, so resolution hints bought nothing and only gave
+        // the driver more to renegotiate. facingMode stays for the no-device
+        // case: it is the difference between a phone opening its selfie camera
+        // and its rear one.
         //
-        // `facingMode: "user"` was the only thing that differed between the
-        // first start and every later camera switch — which is exactly the
-        // pattern behind the green flicker: it appeared on start-up and never
-        // came back once a device had been picked explicitly, even on the same
-        // camera. It's a phone front/back hint with nothing to say about a
-        // desktop USB webcam, and asking for it made the driver renegotiate.
-        //
-        // The resolution hints go too. Every capture is centre-cropped and
-        // downscaled to 320px, so asking a 16:9 webcam for a 960x720 4:3 mode
-        // bought nothing and gave the driver another reason to reconfigure.
+        // (An earlier version of this comment blamed facingMode for a green
+        // start-up flicker on one webcam. It wasn't ours — the same camera
+        // flickers in its own vendor app.)
         const stream = await openCameraStream(
           requested || undefined,
-          requested ? { deviceId: { exact: requested } } : {},
+          requested ? { deviceId: { exact: requested } } : { facingMode: "user" },
         );
         streamRef.current = stream;
         if (videoRef.current) {

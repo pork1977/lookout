@@ -4,13 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import DescribeStep from "./DescribeStep";
 import ExamplesStep from "./ExamplesStep";
 import ReviewStep from "./ReviewStep";
+import TrainStep from "./TrainStep";
 import { MAX_CLASSES, MIN_CLASSES, type DetectorClass, type ExampleImage } from "./types";
 import type { Preset } from "@/lib/presets";
 
 const STEPS = ["Describe", "Examples", "Review & label", "Train", "Triggers", "Deploy"] as const;
 
 /** Built so far. The rest are laid out greyed so the shape of the flow is visible. */
-const LIVE_STEPS = 3;
+const LIVE_STEPS = 4;
 
 export default function BuildWizard() {
   const [step, setStep] = useState(0);
@@ -204,14 +205,17 @@ export default function BuildWizard() {
           onBack={() => setStep(0)}
           onContinue={() => setStep(2)}
         />
-      ) : (
+      ) : step === 2 ? (
         <ReviewStep
           description={description}
           classes={classes}
           onMoveExample={moveExample}
           onDeleteExample={deleteExample}
           onBack={() => setStep(1)}
+          onContinue={() => setStep(3)}
         />
+      ) : (
+        <TrainStep classes={classes} onBack={() => setStep(2)} />
       )}
 
       {/* Persistence is Phase G. Saying so here beats letting someone lose
