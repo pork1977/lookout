@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import CapturePanel from "./CapturePanel";
 import {
   MIN_PER_CLASS,
@@ -201,14 +202,29 @@ function Thumbnail({
   onDelete: () => void;
   onMove: (toClassId: string) => void;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
-    <li className="group relative aspect-square overflow-hidden rounded-lg border border-border">
+    // No overflow clipping here: the move menu has to be able to hang below the
+    // thumbnail. The image rounds its own corners instead.
+    <li className="group relative aspect-square">
       {/* A plain <img>: these are object URLs for in-memory blobs, which the
           Next image pipeline can neither optimise nor size ahead of time. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={example.url} alt="" className="h-full w-full object-cover" />
+      <img
+        src={example.url}
+        alt=""
+        className="absolute inset-0 h-full w-full rounded-lg border border-border object-cover"
+      />
 
-      <div className="absolute inset-0 flex flex-col items-stretch justify-center gap-1.5 bg-background/80 p-2 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+      <div
+        className={`absolute inset-0 flex flex-col items-stretch justify-center gap-1.5 rounded-lg bg-background/80 p-2 backdrop-blur-sm transition-opacity ${
+          // Pinned open while the menu is: moving the pointer onto the menu
+          // leaves the thumbnail, and a hover-only rule would hide the controls
+          // out from under it.
+          menuOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
+        }`}
+      >
         <button
           onClick={onDelete}
           className="w-full rounded-full bg-surface px-2 py-1.5 text-[11px] font-medium text-foreground hover:bg-surface-raised"
@@ -216,9 +232,8 @@ function Thumbnail({
           Delete
         </button>
 
-        {/* With the usual two groups there's only one place to move to, so a
-            plain button beats a dropdown whose own label is the widest thing
-            in it. The select is kept for the three-or-more case. */}
+        {/* With the usual two groups there's only one destination, so a plain
+            button beats any kind of menu. */}
         {otherClasses.length === 1 ? (
           <button
             onClick={() => onMove(otherClasses[0].id)}
@@ -228,21 +243,97 @@ function Thumbnail({
             Move
           </button>
         ) : otherClasses.length > 1 ? (
-          <select
-            value=""
-            onChange={(e) => e.target.value && onMove(e.target.value)}
-            aria-label="Move to another group"
-            className="w-full rounded-full bg-surface px-2 py-1.5 text-[11px] text-foreground outline-none"
-          >
-            <option value="">Move to…</option>
-            {otherClasses.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name || "Untitled group"}
-              </option>
-            ))}
-          </select>
+          <MoveMenu
+            otherClasses={otherClasses}
+            open={menuOpen}
+            onOpenChange={setMenuOpen}
+            onMove={(id) => {
+              setMenuOpen(false);
+              onMove(id);
+            }}
+          />
         ) : null}
       </div>
     </li>
+  );
+}
+
+/**
+ * Replaces a native <select>.
+ *
+ * The browser draws an option list as its own widget, outside the DOM — its
+ * padding can't be set reliably and its layout can't even be measured, so
+ * "give the text room on the right" isn't something CSS can promise there.
+ * This is the same button-plus-panel pattern the camera picker uses, which
+ * means every edge is ours to space properly.
+ */
+function MoveMenu({
+  otherClasses,
+  open,
+  onOpenChange,
+  onMove,
+}: {
+  otherClasses: DetectorClass[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onMove: (toClassId: string) => void;
+}) {
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(event: PointerEvent) {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) onOpenChange(false);
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onOpenChange(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open, onOpenChange]);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        onClick={() => onOpenChange(!open)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-1.5 rounded-full bg-surface py-1.5 pl-3 pr-2.5 text-[11px] font-medium text-foreground hover:bg-surface-raised"
+      >
+        <span className="truncate">Move to…</span>
+        <svg
+          viewBox="0 0 12 12"
+          className="h-2.5 w-2.5 shrink-0"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.8}
+          aria-hidden
+        >
+          <path d="M2.5 4.5 6 8l3.5-3.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute left-0 top-full z-20 mt-1.5 min-w-full rounded-xl border border-border-strong bg-surface p-1 shadow-2xl"
+        >
+          {otherClasses.map((c) => (
+            <button
+              key={c.id}
+              role="menuitem"
+              onClick={() => onMove(c.id)}
+              className="block w-full max-w-[220px] truncate rounded-lg py-2 pl-3 pr-5 text-left text-[11px] text-foreground transition-colors hover:bg-surface-raised"
+            >
+              {c.name || "Untitled group"}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
