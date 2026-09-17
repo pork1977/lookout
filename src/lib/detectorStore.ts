@@ -40,6 +40,8 @@ export interface DetectorRecord {
    */
   modelClassIds?: string[];
   modelAccuracy?: number;
+  /** "When it sees it, do this". Checked on the way back in, see sanitizeTriggerSettings. */
+  triggers?: unknown;
 }
 
 export interface ExampleRecord {

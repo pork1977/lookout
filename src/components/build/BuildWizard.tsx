@@ -6,17 +6,22 @@ import ExamplesStep from "./ExamplesStep";
 import ReviewStep from "./ReviewStep";
 import TrainStep from "./TrainStep";
 import TriggersStep from "./TriggersStep";
+import DeployStep from "./DeployStep";
 import { MAX_CLASSES, MIN_CLASSES, type DetectorClass, type ExampleImage } from "./types";
 import AccountPanel from "./AccountPanel";
 import DetectorLibrary from "./DetectorLibrary";
 import { disposeHead, loadHead, saveHead, type TrainedHead } from "@/lib/trainer";
 import * as store from "@/lib/detectorStore";
 import type { Preset } from "@/lib/presets";
+import {
+  defaultTriggerSettings,
+  sanitizeTriggerSettings,
+  type TriggerSettings,
+} from "@/lib/triggerSettings";
 
 const STEPS = ["Describe", "Examples", "Review & label", "Train", "Triggers", "Deploy"] as const;
 
-/** Built so far. The rest are laid out greyed so the shape of the flow is visible. */
-const LIVE_STEPS = 5;
+const LIVE_STEPS = STEPS.length;
 
 /** Which detector to reopen on the next visit. */
 const LAST_OPEN_KEY = "lookout.lastDetectorId";
@@ -43,6 +48,9 @@ export default function BuildWizard() {
   const [detectorId, setDetectorId] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState(0);
   const [storageBlocked, setStorageBlocked] = useState(false);
+  const [triggerSettings, setTriggerSettings] = useState<TriggerSettings>(() =>
+    defaultTriggerSettings("class-a"),
+  );
   /**
    * The trained model lives here rather than in the training step, because the
    * triggers step needs it and navigating between the two unmounts one of them.
@@ -97,13 +105,19 @@ export default function BuildWizard() {
    * shape and the wrong one, the photos never change after capture.
    */
   const saveTimerRef = useRef<number | null>(null);
-  const stateRef = useRef({ description, presetId, classes, detectorId });
+  const stateRef = useRef({ description, presetId, classes, detectorId, triggerSettings });
   useEffect(() => {
-    stateRef.current = { description, presetId, classes, detectorId };
+    stateRef.current = { description, presetId, classes, detectorId, triggerSettings };
   });
 
   const persistMeta = useCallback(async () => {
-    const { description: name, presetId: preset, classes: cls, detectorId: id } = stateRef.current;
+    const {
+      description: name,
+      presetId: preset,
+      classes: cls,
+      detectorId: id,
+      triggerSettings: triggers,
+    } = stateRef.current;
     if (!id) return;
     const existing = await store.getDetector(id);
     await store.saveDetector({
@@ -117,6 +131,7 @@ export default function BuildWizard() {
       hasModel: existing?.hasModel ?? false,
       modelClassIds: existing?.modelClassIds,
       modelAccuracy: existing?.modelAccuracy,
+      triggers,
     });
     setSavedAt(Date.now());
   }, []);
@@ -233,6 +248,14 @@ export default function BuildWizard() {
     [activeClassId, newId, trackUrl, persistMeta],
   );
 
+  const updateTriggerSettings = useCallback(
+    (update: (previous: TriggerSettings) => TriggerSettings) => {
+      setTriggerSettings(update);
+      scheduleSave();
+    },
+    [scheduleSave],
+  );
+
   const handleCapture = useCallback((blob: Blob) => addExamples([blob], "camera"), [addExamples]);
   const handleUpload = useCallback((blobs: Blob[]) => addExamples(blobs, "upload"), [addExamples]);
 
@@ -296,6 +319,12 @@ export default function BuildWizard() {
         })),
       );
       setActiveClassId(record.classes[0]?.id ?? "class-a");
+      setTriggerSettings(
+        sanitizeTriggerSettings(
+          record.triggers,
+          record.classes.map((c) => c.id),
+        ),
+      );
       setStep(0);
       setSavedAt(Date.now());
 
@@ -333,6 +362,7 @@ export default function BuildWizard() {
     setPresetId(null);
     setClasses(BLANK_CLASSES());
     setActiveClassId("class-a");
+    setTriggerSettings(defaultTriggerSettings("class-a"));
     setStep(0);
     setSavedAt(Date.now());
   }, [setActiveHead]);
@@ -467,12 +497,24 @@ export default function BuildWizard() {
           onBack={() => setStep(2)}
           onContinue={() => setStep(4)}
         />
-      ) : (
+      ) : step === 4 ? (
         <TriggersStep
           classes={classes}
           head={head}
           detectorName={description || "Lookout"}
+          settings={triggerSettings}
+          onSettingsChange={updateTriggerSettings}
           onBack={() => setStep(3)}
+          onContinue={() => setStep(5)}
+        />
+      ) : (
+        <DeployStep
+          detectorId={detectorId}
+          detectorName={description}
+          classes={classes}
+          head={head}
+          settings={triggerSettings}
+          onBack={() => setStep(4)}
         />
       )}
 

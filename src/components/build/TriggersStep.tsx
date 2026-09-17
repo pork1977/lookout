@@ -4,15 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { drawFrameForInference } from "@/lib/imageCapture";
 import { readFrame, type TrainedHead } from "@/lib/trainer";
 import {
-  DEFAULT_RULE,
   TriggerEngine,
   type CameraReading,
   type CombineRule,
   type TriggerRule,
 } from "@/lib/triggerEngine";
 import { useMediaDevices } from "@/lib/useMediaDevices";
+import type { TriggerSettings } from "@/lib/triggerSettings";
 import {
-  DEFAULT_SPEECH,
   dispatch,
   notificationPermission,
   notify,
@@ -69,17 +68,52 @@ export default function TriggersStep({
   classes,
   head,
   detectorName,
+  settings,
+  onSettingsChange,
   onBack,
+  onContinue,
 }: {
   classes: DetectorClass[];
   head: TrainedHead | null;
   detectorName: string;
+  /**
+   * Owned by the wizard, so the settings survive leaving this step, save with
+   * the detector, and are what the Deploy step shares.
+   */
+  settings: TriggerSettings;
+  onSettingsChange: (update: (previous: TriggerSettings) => TriggerSettings) => void;
   onBack: () => void;
+  onContinue: () => void;
 }) {
-  const [classId, setClassId] = useState(classes[0]?.id ?? "");
-  const [rule, setRule] = useState<TriggerRule>({ ...DEFAULT_RULE, classId: classes[0]?.id ?? "" });
-  const [template, setTemplate] = useState("Lookout saw {what} ({confidence})");
-  const [clientActions, setClientActions] = useState<Set<ClientActionId>>(new Set(["banner"]));
+  // A saved setting can point at a group that has since been removed.
+  const classId = classes.some((c) => c.id === settings.rule.classId)
+    ? settings.rule.classId
+    : (classes[0]?.id ?? "");
+  const rule = settings.rule;
+  const template = settings.template;
+  const speech = settings.speech;
+  const clientActions = useMemo(() => new Set(settings.clientActions), [settings.clientActions]);
+
+  const setRule = useCallback(
+    (update: (previous: TriggerRule) => TriggerRule) =>
+      onSettingsChange((s) => ({ ...s, rule: update(s.rule) })),
+    [onSettingsChange],
+  );
+  const setClassId = useCallback((id: string) => setRule((r) => ({ ...r, classId: id })), [setRule]);
+  const setTemplate = useCallback(
+    (next: string) => onSettingsChange((s) => ({ ...s, template: next })),
+    [onSettingsChange],
+  );
+  const setSpeech = useCallback(
+    (update: (previous: SpeechOptions) => SpeechOptions) =>
+      onSettingsChange((s) => ({ ...s, speech: update(s.speech) })),
+    [onSettingsChange],
+  );
+  const setClientActions = useCallback(
+    (update: (previous: Set<ClientActionId>) => Set<ClientActionId>) =>
+      onSettingsChange((s) => ({ ...s, clientActions: [...update(new Set(s.clientActions))] })),
+    [onSettingsChange],
+  );
   const [serverTargets, setServerTargets] = useState<Record<string, string>>({});
   const [emailAvailable, setEmailAvailable] = useState(true);
 
@@ -100,7 +134,6 @@ export default function TriggersStep({
   const [banner, setBanner] = useState<string | null>(null);
   const [notifyPermission, setNotifyPermission] = useState<NotificationPermission | "unsupported">("default");
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [speech, setSpeech] = useState<SpeechOptions>({ ...DEFAULT_SPEECH });
   const [log, setLog] = useState<Array<{ at: string; text: string; seenBy?: string; error?: string }>>([]);
 
   const { cameras: devices, hasLabels, refresh: refreshDevices } = useMediaDevices();
@@ -369,7 +402,6 @@ export default function TriggersStep({
                     key={cls.id}
                     onClick={() => {
                       setClassId(cls.id);
-                      setRule((r) => ({ ...r, classId: cls.id }));
                     }}
                     className="rounded-full border px-4 py-2 text-sm transition-colors"
                     style={{
@@ -729,7 +761,7 @@ export default function TriggersStep({
         </div>
       </div>
 
-      <Footer onBack={onBack} />
+      <Footer onBack={onBack} onContinue={onContinue} />
     </div>
   );
 }
@@ -805,7 +837,7 @@ function NumberField({
   );
 }
 
-function Footer({ onBack }: { onBack: () => void }) {
+function Footer({ onBack, onContinue }: { onBack: () => void; onContinue?: () => void }) {
   return (
     <div className="rounded-2xl border border-border bg-surface p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -815,15 +847,20 @@ function Footer({ onBack }: { onBack: () => void }) {
         >
           Back
         </button>
-        <div className="flex items-center gap-2 rounded-full border border-dashed border-border-strong px-4 py-2">
-          <span className="text-sm font-medium text-muted">Deploy</span>
-          <span className="rounded-full bg-surface-raised px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-accent">
-            Being built
-          </span>
-        </div>
+        {onContinue && (
+          <button
+            onClick={onContinue}
+            className="rounded-full px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_10px_30px_-8px_var(--glow)] transition-transform hover:scale-[1.02]"
+            style={{ backgroundImage: "linear-gradient(135deg, var(--accent), var(--accent-strong))" }}
+          >
+            Share it
+          </button>
+        )}
       </div>
       <p className="mt-3 text-xs leading-relaxed text-muted">
-        Everything here runs in this tab. Keep it open, and in front, while it watches.
+        {onContinue
+          ? "Watching runs in this tab, so keep it open and in front. Next: a link that runs this detector on any phone or laptop."
+          : "Train it first, then set up what happens when it sees something."}
       </p>
     </div>
   );
