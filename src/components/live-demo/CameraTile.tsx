@@ -409,6 +409,11 @@ function CameraTile({
       return;
     }
 
+    // Start the model download alongside the permission prompt rather than
+    // after it. The prompt can sit open for a while, and that time was wasted.
+    const detectorReady = startDetector();
+    detectorReady.catch(() => undefined);
+
     setStatus("requesting-camera");
     let resolvedId: string | undefined;
     try {
@@ -420,7 +425,7 @@ function CameraTile({
 
     setStatus("loading-model");
     try {
-      await startDetector();
+      await detectorReady;
     } catch {
       setStatus("error");
       return;
