@@ -1,5 +1,6 @@
 import LiveDemo from "./LiveDemo";
 import TrailField from "./TrailField";
+import TryDemoButton from "./TryDemoButton";
 
 export default function Hero() {
   // scroll-mt clears the sticky header, so the CTAs land on the section rather
@@ -36,15 +37,7 @@ export default function Hero() {
             Slack, Discord or a webhook.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-4">
-            <a
-              href="#demo"
-              className="rounded-full px-6 py-3 text-sm font-semibold text-accent-ink shadow-[0_10px_30px_-8px_var(--glow)] transition-transform hover:scale-[1.02]"
-              style={{
-                backgroundImage: "linear-gradient(135deg, var(--accent), var(--accent-strong))",
-              }}
-            >
-              Try the live demo below
-            </a>
+            <TryDemoButton />
             <a
               href="#how-it-works"
               className="rounded-full border border-border-strong px-6 py-3 text-sm font-medium text-foreground transition-colors hover:bg-surface-raised"

@@ -11,6 +11,8 @@ import { inkFor } from "@/lib/colorInk";
 import { classifyCameraError, openCameraStream } from "@/lib/cameraStream";
 import type { TrackedDetection } from "./types";
 
+export const START_DEMO_EVENT = "lookout:start-demo";
+
 type TileStatus =
   | "idle"
   | "requesting-camera"
@@ -442,6 +444,25 @@ function CameraTile({
   useEffect(() => {
     startRef.current = start;
   }, [start]);
+
+  // The hero's "Try the live demo" button starts the first camera. Only the
+  // primary tile (the one with onStart) listens, and only when it's idle or
+  // stopped, so a running demo isn't restarted.
+  const statusRef = useRef(status);
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
+  useEffect(() => {
+    if (!onStart) return;
+    function startFromHero() {
+      const current = statusRef.current;
+      if (current === "idle" || current === "camera-denied" || current === "camera-busy" || current === "error") {
+        void startRef.current();
+      }
+    }
+    window.addEventListener(START_DEMO_EVENT, startFromHero);
+    return () => window.removeEventListener(START_DEMO_EVENT, startFromHero);
+  }, [onStart]);
 
   useEffect(() => {
     if (autoStart) startRef.current();
