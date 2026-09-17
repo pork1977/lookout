@@ -4,8 +4,8 @@
  *
  * Honest about what this is: module scope on a serverless platform is
  * per-instance, so this slows abuse rather than hard-capping it globally.
- * The durable version is the Upstash Redis limiter documented in
- * .env.example; this is the fallback that file describes.
+ * A shared store (e.g. Upstash Redis) would make it durable across
+ * instances; nothing here depends on one existing.
  */
 const WINDOW_MS = 10 * 60 * 1000;
 const IMAGES_PER_WINDOW = 300;
