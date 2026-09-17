@@ -406,7 +406,9 @@ export default function BuildWizard() {
             right here in your browser.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        {/* relative: below lg this row wraps under the title, so the two panels anchor
+            to the row instead of their own buttons and stay on screen. */}
+        <div className="relative flex items-center gap-2">
           <AccountPanel
             currentDetectorId={detectorId}
             onRestored={(id) => void loadDetector(id)}

@@ -124,7 +124,7 @@ export default function AccountPanel({
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className="lg:relative">
       <button
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
@@ -150,7 +150,7 @@ export default function AccountPanel({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-10 z-40 w-80 rounded-2xl border border-border-strong bg-surface p-4 shadow-2xl">
+        <div className="absolute left-0 top-10 z-40 w-80 max-w-[calc(100vw-3rem)] rounded-2xl border border-border-strong bg-surface p-4 shadow-2xl lg:left-auto lg:right-0">
           {!user ? (
             <>
               <h3 className="text-sm font-semibold text-foreground">
