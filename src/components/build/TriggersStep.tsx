@@ -854,13 +854,13 @@ function Footer({ onBack, onContinue }: { onBack: () => void; onContinue?: () =>
             className="rounded-full px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_10px_30px_-8px_var(--glow)] transition-transform hover:scale-[1.02]"
             style={{ backgroundImage: "linear-gradient(135deg, var(--accent), var(--accent-strong))" }}
           >
-            Share it
+            Share or export
           </button>
         )}
       </div>
       <p className="mt-3 text-xs leading-relaxed text-muted">
         {onContinue
-          ? "Watching runs in this tab, so keep it open and in front. Next: a link that runs this detector on any phone or laptop."
+          ? "Watching runs in this tab, so keep it open and in front. Next: share it as a link, or export it for use in your own code."
           : "Train it first, then set up what happens when it sees something."}
       </p>
     </div>

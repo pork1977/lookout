@@ -13,7 +13,7 @@ Lookout lets you build a custom camera detector in the browser. You describe wha
 3. **Review and label (optional).** Claude checks your photos and flags any that look like they're in the wrong group, so you only need to look at those.
 4. **Train.** Training takes a few seconds. You can then point the camera at the subject and watch the confidence for each group update live. The *Show what it's looking at* switch highlights the part of the picture that influenced the result.
 5. **Triggers.** Choose which group to watch for, how long it needs to be seen, and what should happen: speech, a banner, a browser notification, Slack, Discord, a webhook or email. Up to three cameras can be used, with a choice of whether any camera or every camera has to see it.
-6. **Share.** Create a link that runs the detector on another phone or laptop, and the person opening it doesn't need an account. The link contains the trained model and its on-device reactions. Your photos and your Slack, Discord, webhook and email settings aren't included.
+6. **Share or export.** Create a link that runs the detector on another phone or laptop, and the person opening it doesn't need an account. The link contains the trained model and its on-device reactions. Your photos and your Slack, Discord, webhook and email settings aren't included. Export downloads a zip with the trained model, its metadata, the training photos in a folder per group, and an `index.html` that runs the detector when opened, so developers can use it in their own projects.
 
 Detectors are saved in the browser as you work. An optional account lets you back them up and restore them on another machine.
 

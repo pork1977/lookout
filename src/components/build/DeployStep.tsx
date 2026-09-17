@@ -44,6 +44,8 @@ export default function DeployStep({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportNote, setExportNote] = useState<string | null>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -106,6 +108,29 @@ export default function DeployStep({
       setBusy(null);
     }
   }, [detectorId]);
+
+  const exportZip = useCallback(async () => {
+    if (!head) return;
+    setExporting(true);
+    setExportNote(null);
+    setError(null);
+    try {
+      // Loaded on demand: the zip library is only needed at the moment of export.
+      const { downloadDetectorExport } = await import("@/lib/exportDetector");
+      const result = await downloadDetectorExport({
+        name: detectorName,
+        groups: classes,
+        head,
+        settings,
+      });
+      const megabytes = (result.bytes / (1024 * 1024)).toFixed(1);
+      setExportNote(`Downloaded ${result.fileName} (${megabytes}MB). Unzip it and open index.html.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't export it.");
+    } finally {
+      setExporting(false);
+    }
+  }, [head, detectorName, classes, settings]);
 
   const copy = useCallback(async (url: string) => {
     try {
@@ -201,6 +226,13 @@ export default function DeployStep({
           >
             {busy === "publish" ? "Uploading…" : url ? "Update the link" : "Create a link"}
           </button>
+          <button
+            onClick={exportZip}
+            disabled={exporting}
+            className="rounded-full border border-border-strong px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {exporting ? "Preparing the zip…" : "Export"}
+          </button>
           {url &&
             (confirmStop ? (
               <span className="flex flex-wrap items-center gap-2 text-xs text-muted">
@@ -228,6 +260,7 @@ export default function DeployStep({
               </button>
             ))}
         </div>
+        {exportNote && <p className="text-sm text-muted">{exportNote}</p>}
         {error && <p className="text-sm text-foreground">{error}</p>}
       </div>
     );
@@ -237,11 +270,16 @@ export default function DeployStep({
     <div className="space-y-5">
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)] lg:items-start">
         <section className="rounded-2xl border border-border bg-surface p-6">
-          <h2 className="text-sm font-semibold text-foreground">Share a run link</h2>
+          <h2 className="text-sm font-semibold text-foreground">Share or export</h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
-            Create a link that runs this detector on another phone or laptop with a camera. The
-            person opening it doesn&apos;t need an account, and the detector can&apos;t be
-            changed from the link.
+            <span className="text-foreground">Create a link</span> to run this detector on
+            another phone or laptop with a camera. The person opening it doesn&apos;t need an
+            account, and the detector can&apos;t be changed from the link.
+          </p>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
+            <span className="text-foreground">Export</span> downloads a zip for developers: the
+            trained model, its metadata, your photos in a folder per group, and an index.html
+            that runs the detector when opened.
           </p>
           <div className="mt-5">{body}</div>
         </section>

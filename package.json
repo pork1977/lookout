@@ -16,6 +16,7 @@
     "@supabase/supabase-js": "^2.116.0",
     "@tensorflow-models/mobilenet": "^2.1.1",
     "@tensorflow/tfjs": "^4.22.0",
+    "fflate": "^0.8.3",
     "next": "16.3.5",
     "react": "19.2.8",
     "react-dom": "19.2.8",

@@ -19,7 +19,7 @@ import {
   type TriggerSettings,
 } from "@/lib/triggerSettings";
 
-const STEPS = ["Describe", "Examples", "Review & label", "Train", "Triggers", "Deploy"] as const;
+const STEPS = ["Describe", "Examples", "Review & label", "Train", "Triggers", "Deploy & export"] as const;
 
 const LIVE_STEPS = STEPS.length;
 
