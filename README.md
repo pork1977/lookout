@@ -13,6 +13,7 @@ Teach your camera to notice anything. Describe what you want it to catch, show i
 3. **Review and label (optional).** Claude looks over your photos and flags any that seem to be in the wrong group, so you only check the doubtful ones.
 4. **Train.** A few seconds, in the tab. Then point the camera at the thing and watch the confidence bars move. Switch on *Show what it's looking at* to see which part of the picture made it decide.
 5. **Triggers.** Pick what it should watch for, how long it has to hold, and what happens: speak, banner, browser notification, Slack, Discord, any webhook, or email. Watch with up to three cameras and choose whether any camera or every camera has to see it.
+6. **Share.** Create a link that runs the detector on any phone or laptop, no account needed to open it. The link carries the trained model and its on-device reactions, never your photos, and never your Slack, Discord, webhook or email settings.
 
 Detectors save themselves in your browser as you go. An optional account backs them up so you can bring them onto another machine.
 
@@ -28,6 +29,7 @@ The homepage also has a live demo that recognises around 80 everyday objects wit
 - **The live demo** uses [COCO-SSD](https://github.com/tensorflow/tfjs-models/tree/master/coco-ssd), starting on a small model and upgrading to a more accurate one in the background. *Sharper detection* hands the work to Google's [MediaPipe](https://ai.google.dev/edge/mediapipe/solutions/vision/object_detector) EfficientDet-Lite0, an extra 7MB download, and drops back to COCO-SSD automatically if a device can't run it.
 - **Labelling help** sends only the photos you ask it to check to Claude (Haiku 4.5), with structured output so every answer maps back to a real photo.
 - **Anything that leaves the browser** (Slack, Discord, webhooks, email) goes through a server route, so webhook URLs and keys never sit in the page. Webhooks must be https, and addresses that resolve to private or reserved networks are refused.
+- **Run links** store the trained classifier at 8 bits per weight (about 170KB, within 1% of the original's confidence). Anyone can fetch one share by its random link through a single database function, but nobody can list them, and only the owner can change or remove one.
 - **Accounts** are [Supabase](https://supabase.com) with row-level security on every table and a private storage bucket. Backup and restore are explicit buttons rather than background sync, so nothing is ever silently overwritten.
 
 ## Optional features and keys
@@ -38,7 +40,7 @@ Every integration is switched on by an environment variable. Leave one out and t
 | --- | --- |
 | `ANTHROPIC_API_KEY` | AI-assisted labelling |
 | `BREVO_API_KEY` or `RESEND_API_KEY`, plus `EMAIL_FROM` | Email triggers |
-| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Accounts and backup |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Accounts, backup and run links |
 
 **No key or secret is committed to this repository.** Real values belong in `.env.local` (gitignored) or your host's project settings. A pre-commit hook refuses any commit that puts a value into `.env.example`.
 
@@ -51,7 +53,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Then open [http://localhost:3000](http://localhost:3000). Everything except labelling, email and accounts works with no keys at all.
+Then open [http://localhost:3000](http://localhost:3000). Everything except labelling, email, accounts and run links works with no keys at all.
 
 If you use accounts, apply the migrations in [`supabase/migrations`](supabase/migrations) to your own project.
 

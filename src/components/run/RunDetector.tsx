@@ -21,6 +21,12 @@ import WatchTile, { type WatchStatus } from "@/components/build/WatchTile";
 
 const PREDICT_INTERVAL_MS = 120;
 const CAMERA_ID = "run-camera";
+/**
+ * A shared link's settings come from someone else. Without a floor, a share
+ * with no cooldown and notifications ticked would fire a notification every
+ * frame on the viewer's device.
+ */
+const MIN_SHARED_COOLDOWN_SECONDS = 5;
 
 type Phase = "loading" | "ready" | "missing" | "error";
 
@@ -79,6 +85,10 @@ export default function RunDetector({ slug }: { slug: string }) {
           setPhase("missing");
           return;
         }
+        loaded.settings.rule.cooldownSeconds = Math.max(
+          MIN_SHARED_COOLDOWN_SECONDS,
+          loaded.settings.rule.cooldownSeconds,
+        );
         setDetector(loaded);
         setActions(new Set(loaded.settings.clientActions));
         setPhase("ready");
