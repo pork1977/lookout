@@ -307,9 +307,9 @@ export default function LiveDemo() {
       </div>
 
       <p className="mt-3 text-center text-xs text-muted">
-        This demo recognizes ~80 everyday objects out of the box. Your own custom detector (a
-        specific mug, a specific gesture, whatever you like) is what the builder trains from your
-        own photos.
+        This demo recognises about 80 everyday objects without any training. For something more
+        specific, like a particular mug or gesture, the builder trains a detector from your own
+        photos.
       </p>
     </div>
   );

@@ -79,7 +79,7 @@ export default function AuthCallback() {
           </h1>
           <p className="mt-2 text-xs leading-relaxed text-muted">
             Confirmation links can only be used once, and they expire. If you&apos;ve already
-            confirmed, just sign in.
+            confirmed, sign in instead.
           </p>
         </>
       )}

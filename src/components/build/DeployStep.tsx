@@ -187,8 +187,8 @@ export default function DeployStep({
           </div>
         ) : (
           <p className="text-sm leading-relaxed text-muted">
-            Not shared yet. Creating a link uploads the trained model and its settings, never
-            your photos.
+            Not shared yet. Creating a link uploads the trained model and its settings. Your
+            photos aren&apos;t included.
           </p>
         )}
 
@@ -239,8 +239,9 @@ export default function DeployStep({
         <section className="rounded-2xl border border-border bg-surface p-6">
           <h2 className="text-sm font-semibold text-foreground">Share a run link</h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
-            A link that runs this detector on any phone or laptop with a camera. It trains nothing
-            and needs no account to open, it just watches and reacts.
+            Create a link that runs this detector on another phone or laptop with a camera. The
+            person opening it doesn&apos;t need an account, and the detector can&apos;t be
+            changed from the link.
           </p>
           <div className="mt-5">{body}</div>
         </section>

@@ -22,7 +22,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Lookout: teach your camera to notice anything",
   description:
-    "Build a custom AI detector that watches your webcam and reacts the moment it sees something specific. No code, no dataset, no machine learning background needed.",
+    "Build a custom detector that watches your webcam and reacts when it sees something specific. You describe it, add example photos, and train it in the browser.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

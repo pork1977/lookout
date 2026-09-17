@@ -263,7 +263,7 @@ export default function RunDetector({ slug }: { slug: string }) {
           {detector.name || "Untitled detector"}
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
-          Built with Lookout and running entirely on this device. Your camera feed never leaves it.
+          Built with Lookout. The detector runs on this device, and the camera feed isn&apos;t uploaded.
         </p>
       </header>
 

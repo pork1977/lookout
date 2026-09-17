@@ -2,22 +2,22 @@ const steps = [
   {
     number: "01",
     title: "Say what to notice",
-    body: "Describe it in plain English, or pick one of ours: “tell me when I bring a drink to my desk”, “tell me when someone walks up behind me”.",
+    body: "Describe it in your own words, or start from an idea such as “tell me when I bring a drink to my desk” or “tell me when someone walks up behind me”.",
   },
   {
     number: "02",
     title: "Show it a few examples",
-    body: "Snap a handful of photos with your webcam or upload some. Claude helps label them, you only review the ones it's unsure about.",
+    body: "Take some photos with your webcam or upload them. Claude can check them and flag any that look like they're in the wrong group.",
   },
   {
     number: "03",
-    title: "It trains itself, on the spot",
-    body: "Your browser trains a small custom model on your examples in seconds. No queue, no waiting, no email later.",
+    title: "Train it in the browser",
+    body: "A small model is trained on your examples in the page. It usually takes a few seconds, and your photos aren't sent to a server.",
   },
   {
     number: "04",
     title: "Pick what happens next",
-    body: "Speak a phrase out loud, pop a notification, message Slack or Discord, call any webhook, or send an email, whenever it spots your thing.",
+    body: "When it sees what you trained it for, it can speak a phrase, show a notification, message Slack or Discord, call a webhook, or send an email.",
   },
 ];
 
@@ -30,8 +30,8 @@ export default function HowItWorks() {
             How it works
           </h2>
           <p className="mt-4 text-muted">
-            No code. No dataset to gather. No machine learning background needed. If you can take
-            a few photos and describe what you want, you can build one of these.
+            Building a detector takes four steps and doesn&apos;t involve writing code or
+            collecting a dataset.
           </p>
         </div>
 

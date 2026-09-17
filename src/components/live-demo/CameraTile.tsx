@@ -514,7 +514,7 @@ function CameraTile({
               </button>
               {!everStarted && (
                 <p className="max-w-sm text-muted" style={{ fontSize: "0.88em" }}>
-                  Runs a real object-detection model live in this tab. Nothing is uploaded anywhere.
+                  Object detection runs in this tab, and the video isn&apos;t uploaded.
                 </p>
               )}
             </>
@@ -536,11 +536,11 @@ function CameraTile({
                 ) : compact ? (
                   // The full explanation doesn't fit a grid tile at a legible
                   // size, so the small view gets the actionable half of it.
-                  <>{cameraLabel} couldn&apos;t start, try stopping one of the other cameras.</>
+                  <>{cameraLabel} couldn&apos;t start. Try stopping one of the other cameras.</>
                 ) : (
                   <>
                     {cameraLabel} couldn&apos;t start. It may be in use by another app, or your USB
-                    controller may not have the bandwidth for this many cameras at once, try
+                    controller may not have the bandwidth for this many cameras at once. Try
                     stopping one of the others.
                   </>
                 )}

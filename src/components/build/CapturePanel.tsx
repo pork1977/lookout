@@ -196,7 +196,7 @@ export default function CapturePanel({
                   Turn on your camera
                 </button>
                 <p className="max-w-sm text-xs text-muted">
-                  Photos stay in this browser tab. Nothing is uploaded.
+                  Photos are saved in this browser and aren&apos;t uploaded.
                 </p>
               </>
             )}
@@ -251,8 +251,8 @@ export default function CapturePanel({
               photos land, so the target group is still unambiguous. */}
           <p className="text-center text-xs text-muted">
             Tap for a single photo. Both go into{" "}
-            <span className="font-medium text-foreground">&ldquo;{targetName}&rdquo;</span>. Move
-            around between shots, because varied angles and lighting make it reliable.
+            <span className="font-medium text-foreground">&ldquo;{targetName}&rdquo;</span>. Vary
+            the angle and lighting between shots, which makes the detector more reliable.
           </p>
 
           {hasLabels && cameras.length > 1 && (

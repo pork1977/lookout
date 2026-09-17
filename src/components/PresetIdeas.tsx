@@ -10,8 +10,8 @@ export default function PresetIdeas() {
             Don&apos;t know what to build? Start here
           </h2>
           <p className="mt-4 text-muted">
-            A few ready-made ideas to get you going, or write your own from scratch. Each one
-            arrives in the builder with its description and photo groups already filled in.
+            Pick one of these to open the builder with the description and photo groups filled
+            in, or write your own.
           </p>
         </div>
 

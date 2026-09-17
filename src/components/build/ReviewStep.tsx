@@ -173,8 +173,8 @@ export default function ReviewStep({
             set on the server, and this deployment doesn&apos;t have one.
           </p>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
-            Nothing else is blocked. Your photos are already sorted into the groups you put them
-            in, which is all training needs.
+            You can still continue. Your photos are already in the groups you chose, and that is
+            all training needs.
           </p>
         </div>
         <Footer onBack={onBack} onContinue={onContinue} />
@@ -360,8 +360,8 @@ function Footer({ onBack, onContinue }: { onBack: () => void; onContinue: () => 
         </button>
       </div>
       <p className="mt-3 text-xs leading-relaxed text-muted">
-        Training runs in this tab and takes seconds, because a pretrained vision model does the heavy
-        lifting, and only a small classifier on top actually learns your groups.
+        Training runs in this tab and usually takes a few seconds. A pretrained vision model reads
+        the photos, and only a small classifier on top of it is trained on your groups.
       </p>
     </div>
   );

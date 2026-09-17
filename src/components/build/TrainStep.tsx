@@ -180,9 +180,10 @@ export default function TrainStep({
         <div className="rounded-2xl border border-border bg-surface p-6">
           <h2 className="text-sm font-semibold text-foreground">Train your detector</h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
-            Your {totalExamples} photos run once through a pretrained vision model to turn each
-            into a compact fingerprint, then a small classifier learns to tell your groups apart
-            from those. It all happens in this tab, with no upload and no queue, and it takes seconds.
+            Each of your {totalExamples} photos is run once through a pretrained vision model,
+            which turns it into a list of numbers describing what&apos;s in it. A small classifier
+            then learns to tell your groups apart from those. This happens in this tab and usually
+            takes a few seconds.
           </p>
           <button
             onClick={train}
@@ -243,8 +244,8 @@ export default function TrainStep({
               if you switch away, and picks up again when you come back. Saying so
               beats looking frozen. */}
           <p className="mt-2 text-xs text-muted">
-            Keep this tab in front, training pauses if you switch away, and resumes when you
-            come back.
+            Keep this tab in front. Training pauses if you switch to another tab and resumes when
+            you come back.
           </p>
         </div>
       )}
@@ -269,7 +270,8 @@ export default function TrainStep({
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
               It got {Math.round(head.finalAccuracy * 100)}% right on the photos it learned from.
-              That number always flatters, it&apos;s the real test below that tells you anything.
+              That figure is usually higher than real-world accuracy, so the live test below is a
+              better guide.
             </p>
           </div>
 
@@ -302,7 +304,7 @@ export default function TrainStep({
                         Test it on your camera
                       </button>
                       <p className="max-w-sm text-xs text-muted">
-                        Point it at the thing you trained it on and watch the bars move.
+                        Point it at the thing you trained it on and watch the bars change.
                       </p>
                     </>
                   )}
@@ -314,7 +316,7 @@ export default function TrainStep({
                       <p className="text-sm text-foreground">
                         {cameraState === "denied"
                           ? "Camera access was blocked. Allow it and try again."
-                          : "That camera couldn't start, it may be in use by another app."}
+                          : "That camera couldn't start. It may be in use by another app."}
                       </p>
                       <button
                         onClick={startCamera}
@@ -386,9 +388,9 @@ export default function TrainStep({
                 </div>
               )}
               <p className="mt-5 border-t border-border pt-4 text-xs leading-relaxed text-muted">
-                Weak spot? Go back to Examples, add photos of the case it gets wrong, and train
-                again, the photos it has already seen are cached, so a retrain only pays for the
-                new ones.
+                If it gets something wrong, go back to Examples, add photos of that case and train
+                again. Photos it has already processed are cached, so only the new ones need
+                reading.
               </p>
             </div>
           </div>
@@ -416,7 +418,7 @@ export default function TrainStep({
         </div>
         <p className="mt-3 text-xs leading-relaxed text-muted">
           {head
-            ? "Next: decide what happens when it sees something, speak, notify, banner, Slack, Discord, webhook or email."
+            ? "Next, choose what happens when it sees something: speech, a banner, a notification, Slack, Discord, a webhook or email."
             : "Train it first, then you can decide what happens when it sees something."}
         </p>
       </div>

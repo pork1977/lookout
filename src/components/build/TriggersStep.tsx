@@ -52,8 +52,8 @@ function shortCameraLabel(label: string | undefined, index: number): string {
 }
 
 const CLIENT_ACTIONS: Array<{ id: ClientActionId; label: string; blurb: string }> = [
-  { id: "speak", label: "Say it out loud", blurb: "Web Speech, instant, works offline" },
-  { id: "banner", label: "Show a banner", blurb: "On this page, instant" },
+  { id: "speak", label: "Say it out loud", blurb: "Uses the browser's built-in speech and works offline" },
+  { id: "banner", label: "Show a banner", blurb: "Appears at the top of this page" },
   { id: "notify", label: "Browser notification", blurb: "Works while this tab is in the background" },
 ];
 
@@ -433,7 +433,7 @@ export default function TriggersStep({
                 min={0}
                 max={86400}
                 onChange={(cooldownSeconds) => setRule((r) => ({ ...r, cooldownSeconds }))}
-                hint="Without this you get one alert per frame for as long as it holds."
+                hint="Without a cooldown it would fire on every frame for as long as the condition holds."
               />
             </div>
 
@@ -467,8 +467,8 @@ export default function TriggersStep({
                 </div>
                 <p className="mt-2 text-xs leading-relaxed text-muted">
                   {rule.combine === "any"
-                    ? "Right for “something is there”, and for cameras watching different places, a camera that can't see the dog isn't evidence there's no dog."
-                    : "Right for “nothing is there”, like “I've left my desk”, one camera still seeing you proves the condition false. Cameras that can only half-see abstain rather than blocking."}
+                    ? "Use this for “something is there” rules, or when the cameras watch different places. One camera not seeing the dog doesn't mean the dog isn't there."
+                    : "Use this for “nothing is there” rules such as “I've left my desk”, where one camera still seeing you means it shouldn't fire. A camera that can only partly see is ignored rather than blocking it."}
                 </p>
               </div>
             )}
@@ -550,8 +550,9 @@ export default function TriggersStep({
                 );
               })}
               <p className="text-xs leading-relaxed text-muted">
-                These go through the server, so your webhook URL never sits in the page. Only
-                https, and addresses on private networks are refused.
+                These are sent through the server, so your webhook URL isn&apos;t exposed in the
+                page. Only https addresses are accepted, and addresses on private networks are
+                refused.
               </p>
             </div>
 
@@ -600,8 +601,8 @@ export default function TriggersStep({
                 <span className="text-foreground">&ldquo;{previewMessage}&rdquo;</span>
               </p>
               <p className="mt-1.5 text-xs text-muted">
-                The round brackets are ordinary text, delete them if you would rather it
-                just said &ldquo;{activeClassName} 92%&rdquo;.
+                The round brackets are ordinary text. Delete them if you would rather it
+                said &ldquo;{activeClassName} 92%&rdquo;.
               </p>
             </div>
 
@@ -643,8 +644,8 @@ export default function TriggersStep({
                   Hear it
                 </button>
                 <p className="mt-2 text-xs leading-relaxed text-muted">
-                  Voices come from your own device and browser, with no service involved. The ones
-                  marked cloud usually sound the most natural.
+                  Voices come from your device and browser. The ones marked cloud usually sound the
+                  most natural.
                 </p>
               </div>
             )}

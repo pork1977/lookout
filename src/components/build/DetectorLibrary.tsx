@@ -77,7 +77,7 @@ export default function DetectorLibrary({
           <div className="max-h-80 overflow-y-auto" style={{ scrollbarGutter: "stable" }}>
             {detectors.length === 0 && (
               <p className="px-3 py-6 text-center text-xs leading-relaxed text-muted">
-                Nothing saved on this browser yet. What you build here saves itself as you go.
+                Nothing is saved in this browser yet. Detectors are saved automatically as you build them.
                 <br />
                 Used another machine? Sign in under Account to bring a backup over.
               </p>

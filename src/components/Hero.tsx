@@ -25,15 +25,15 @@ export default function Hero() {
         <div>
           <span className="inline-flex items-center gap-2 rounded-full border border-border-strong px-3 py-1 text-xs font-medium text-muted">
             <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-            Trained in your browser, in seconds
+            Trains in your browser
           </span>
           <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl">
             Teach your camera to notice anything.
           </h1>
           <p className="mt-6 max-w-lg text-lg leading-relaxed text-muted">
-            Describe what you want it to catch, show it a few examples, and it trains itself
-            right in your browser. Then it can speak, notify, or message Slack, Discord, or any
-            webhook the instant it sees it.
+            Describe what you want it to catch and add a few example photos, and it trains in
+            your browser. When it sees it, it can speak, show a notification, or send a message to
+            Slack, Discord or a webhook.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-4">
             <a

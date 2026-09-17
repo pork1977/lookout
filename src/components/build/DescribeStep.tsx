@@ -39,7 +39,7 @@ export default function DescribeStep({
             What should it notice?
           </label>
           <p className="mt-1.5 text-sm text-muted">
-            Plain English. This is for you and for the labelling step later, not code.
+            Write it in your own words. It becomes the detector&apos;s name and helps guide the labelling step.
           </p>
           <textarea
             id="detector-description"

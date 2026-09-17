@@ -18,7 +18,7 @@ const triggers = [
   {
     name: "Speak out loud",
     tag: "Home",
-    body: "“Why thank you, I'll enjoy that tea!” Any phrase, spoken the instant it fires.",
+    body: "Speaks a phrase you write, such as “Why thank you, I'll enjoy that tea!”, when it fires.",
     icon: (p: SVGProps<SVGSVGElement>) => (
       <IconBase {...p}>
         <path d="M4 9v6h4l5 4V5L8 9H4Z" />
@@ -30,7 +30,7 @@ const triggers = [
   {
     name: "On-screen banner",
     tag: "Anywhere",
-    body: "A clean alert right on the page, no setup required.",
+    body: "Shows an alert on the page. There's nothing to set up.",
     icon: (p: SVGProps<SVGSVGElement>) => (
       <IconBase {...p}>
         <path d="M12 3 3 8v8l9 5 9-5V8l-9-5Z" />
@@ -42,7 +42,7 @@ const triggers = [
   {
     name: "Push notification",
     tag: "Home & office",
-    body: "A desktop notification even while the tab's in the background.",
+    body: "Shows a desktop notification, including while the tab is in the background.",
     icon: (p: SVGProps<SVGSVGElement>) => (
       <IconBase {...p}>
         <path d="M6 8a6 6 0 0 1 12 0c0 4 1.5 5.5 2 6H4c.5-.5 2-2 2-6Z" />
@@ -53,7 +53,7 @@ const triggers = [
   {
     name: "Slack message",
     tag: "Office",
-    body: "Posts straight into a channel via an incoming webhook.",
+    body: "Posts to a channel through an incoming webhook.",
     icon: (p: SVGProps<SVGSVGElement>) => (
       <IconBase {...p}>
         <rect x="4" y="4" width="16" height="13" rx="2" />
@@ -66,7 +66,7 @@ const triggers = [
   {
     name: "Discord message",
     tag: "Home",
-    body: "Pings your server the moment your detector fires.",
+    body: "Posts to a Discord channel through a channel webhook.",
     icon: (p: SVGProps<SVGSVGElement>) => (
       <IconBase {...p}>
         <rect x="4" y="4" width="16" height="13" rx="2" />
@@ -79,7 +79,7 @@ const triggers = [
   {
     name: "Any webhook",
     tag: "Power users",
-    body: "A plain JSON POST to any URL, works with Zapier, Home Assistant, n8n, whatever you run.",
+    body: "Sends a JSON POST to a URL you choose, which works with tools like Zapier, Home Assistant and n8n.",
     icon: (p: SVGProps<SVGSVGElement>) => (
       <IconBase {...p}>
         <path d="M9 15 15 9" />
@@ -91,7 +91,7 @@ const triggers = [
   {
     name: "Email",
     tag: "Office",
-    body: "A message in your inbox when your detector spots what it's watching for.",
+    body: "Sends an email when the detector sees what it's watching for.",
     icon: (p: SVGProps<SVGSVGElement>) => (
       <IconBase {...p}>
         <rect x="3.5" y="5" width="17" height="14" rx="2" />
@@ -110,8 +110,7 @@ export default function TriggerShowcase() {
             Pick what happens when it fires
           </h2>
           <p className="mt-4 text-muted">
-            Every detector can trigger one action or several. Choose whichever fit how you
-            actually work and live.
+            A detector can run one action or several at the same time.
           </p>
         </div>
 
