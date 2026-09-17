@@ -143,29 +143,53 @@ export function exportHtml(meta: ExportMetadata): string {
       startButton.textContent = "Start camera";
       startButton.disabled = false;
 
-      startButton.addEventListener("click", async () => {
-        startButton.disabled = true;
-        const video = document.getElementById("camera");
-        video.srcObject = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        await video.play();
-        startButton.textContent = "Running";
+      const video = document.getElementById("camera");
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = INPUT_SIZE;
+      let timer = null;
 
-        const canvas = document.createElement("canvas");
-        canvas.width = canvas.height = INPUT_SIZE;
+      function stop() {
+        clearInterval(timer);
+        timer = null;
+        video.srcObject?.getTracks().forEach((track) => track.stop());
+        video.srcObject = null;
+        startButton.textContent = "Start camera";
+      }
+
+      async function start() {
+        startButton.disabled = true;
+        try {
+          video.srcObject = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          await video.play();
+        } catch (err) {
+          status.textContent = "Couldn't open the camera: " + err.message;
+          startButton.disabled = false;
+          return;
+        }
+        startButton.textContent = "Stop camera";
+        startButton.disabled = false;
 
         let heldSince = null;
         let lastFired = 0;
+        let busy = false;
 
-        setInterval(async () => {
-          if (video.readyState < 2) return;
+        timer = setInterval(async () => {
+          if (busy || video.readyState < 2) return;
+          busy = true;
           drawFrame(video, canvas, metadata.input.mirrorWebcam);
 
           // The two-stage detector: MobileNet turns the frame into 1280
           // numbers, and the exported classifier turns those into a score
           // per label.
-          const output = tf.tidy(() => classifier.predict(featureModel.infer(canvas, true)));
-          const scores = Array.from(await output.data());
-          output.dispose();
+          let scores;
+          try {
+            const output = tf.tidy(() => classifier.predict(featureModel.infer(canvas, true)));
+            scores = Array.from(await output.data());
+            output.dispose();
+          } finally {
+            busy = false;
+          }
+          if (!timer) return; // stopped while this frame was being scored
           updateBars(scores);
 
           // A simple version of Lookout's trigger: the watched label has to
@@ -184,7 +208,9 @@ export function exportHtml(meta: ExportMetadata): string {
             heldSince = null;
           }
         }, 150);
-      });
+      }
+
+      startButton.addEventListener("click", () => (timer ? stop() : start()));
     })().catch((err) => {
       document.getElementById("status").textContent = "Couldn't start: " + err.message;
     });
