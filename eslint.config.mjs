@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored, gitignored runtime copied in by scripts/copy-mediapipe.mjs
+    // at dev/build time. It's Google's own Emscripten build output, not
+    // something we wrote, so it has no business being linted as our code.
+    "public/mediapipe/**",
   ]),
 ]);
 
