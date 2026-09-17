@@ -21,6 +21,45 @@ Detectors are saved in the browser as you work. An optional account lets you bac
 
 The homepage also has a live demo that recognises around 80 everyday objects and draws boxes around them, across one or more cameras, without any training.
 
+## Use a detector in your own project
+
+Any detector you train can be exported from the **Deploy & export** step as a zip. It contains everything needed to run the detector outside Lookout, including a page that runs it straight away:
+
+```
+desk-watcher/
+  index.html              double-click to run it on your webcam
+  README.md               how the detector works, with example code
+  metadata.json           labels, feature model, image preparation, trigger settings
+  model/model.json        the trained classifier, in TensorFlow.js layers format
+  model/weights.bin
+  model/detector-data.js  the same model data as a script, for opening index.html from disk
+  photos/desk-is-empty/   the training photos, one folder per group
+  photos/im-at-my-desk/
+```
+
+Unzip it and open `index.html`. There's nothing to install and no build step. The page shows live confidence for each group, and fires when the watched group holds for the time you set in Lookout. It's a single readable file, so it also works as a starting point for your own code.
+
+A detector is two models used one after the other: the standard MobileNet v2 feature model, which turns an image into 1280 numbers, and your trained classifier, which turns those numbers into a score per group. Using it in any TensorFlow.js project takes a few lines:
+
+```js
+import * as tf from "@tensorflow/tfjs";
+import * as mobilenet from "@tensorflow-models/mobilenet";
+
+const metadata = await (await fetch("desk-watcher/metadata.json")).json();
+const classifier = await tf.loadLayersModel("desk-watcher/model/model.json");
+const featureModel = await mobilenet.load({ version: 2, alpha: 1.0 });
+
+// canvas: a 320x320 centre-cropped frame, mirrored if it came from a webcam
+const output = tf.tidy(() => classifier.predict(featureModel.infer(canvas, true)));
+const scores = await output.data();
+output.dispose();
+
+const best = scores.indexOf(Math.max(...scores));
+console.log(`${metadata.labels[best]}: ${Math.round(scores[best] * 100)}%`);
+```
+
+`metadata.json` records how the training images were prepared (square centre crop, 320px, webcam frames mirrored). Prepare new images the same way, otherwise accuracy drops without any error. The photos are ordinary JPEGs, so they can also be used to train a model with other tools.
+
 ## How it works
 
 - **Training runs in the browser.** A frozen [MobileNet v2](https://github.com/tensorflow/tfjs-models/tree/master/mobilenet) turns each photo into a 1280-number feature vector, and a small two-layer classifier is trained on those vectors with [TensorFlow.js](https://www.tensorflow.org/js). This is transfer learning, the same approach used by Google's Teachable Machine. It runs on the local GPU, and the photos aren't uploaded anywhere for training.
