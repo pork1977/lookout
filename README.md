@@ -4,8 +4,7 @@ Teach your camera to notice anything. Describe what you want it to catch, show i
 
 **Live:** [lookout.vision](https://lookout.vision)
 
-<!-- Screenshot: save as docs/screenshots/train-live.png, then uncomment. -->
-<!-- ![Training a detector and testing it live on the webcam](docs/screenshots/train-live.png) -->
+![Training a detector and testing it live on the webcam](docs/screenshots/train-live.png)
 
 ## What it does
 
@@ -17,8 +16,7 @@ Teach your camera to notice anything. Describe what you want it to catch, show i
 
 Detectors save themselves in your browser as you go. An optional account backs them up so you can bring them onto another machine.
 
-<!-- Screenshot: save as docs/screenshots/multi-camera.png, then uncomment. -->
-<!-- ![The live demo tracking everyday objects across several cameras at once](docs/screenshots/multi-camera.png) -->
+![The live demo tracking everyday objects across several cameras at once](docs/screenshots/multi-camera.png)
 
 The homepage also has a live demo that recognises around 80 everyday objects with moving boxes, across several cameras at once, with nothing to train.
 
