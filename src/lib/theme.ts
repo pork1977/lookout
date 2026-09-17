@@ -36,6 +36,8 @@ export const THEMES: ThemeDefinition[] = [
   { id: "purple", label: "Purple", group: "color", mode: "dark", hue: 265, bgSat: 45, swatch: "#a879ff" },
   { id: "amber", label: "Amber", group: "color", mode: "dark", hue: 28, bgSat: 42, swatch: "#ff9d42" },
   { id: "rose", label: "Rose", group: "color", mode: "dark", hue: 340, bgSat: 42, swatch: "#ff5c94" },
+  { id: "teal", label: "Teal", group: "color", mode: "dark", hue: 184, bgSat: 45, swatch: "#2ee6d6" },
+  { id: "lime", label: "Lime", group: "color", mode: "dark", hue: 78, bgSat: 30, swatch: "#b8f03c" },
 ];
 
 export const DEFAULT_THEME = "dark";

@@ -126,7 +126,7 @@ export default function ThemeSwitcher() {
                 className="inline-block h-3.5 w-3.5 shrink-0 rounded-full border border-white/20"
                 style={{
                   background:
-                    "conic-gradient(from 180deg, #3b9dff, #a879ff, #ff5c94, #ff9d42, #3b9dff)",
+                    "conic-gradient(from 180deg, #3b9dff, #a879ff, #ff5c94, #ff9d42, #b8f03c, #2ee6d6, #3b9dff)",
                   boxShadow: activeIsColor
                     ? `0 0 0 2px var(--surface), 0 0 0 3.5px ${active.swatch}`
                     : undefined,

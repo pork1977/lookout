@@ -118,6 +118,38 @@
   color-scheme: dark;
 }
 
+[data-theme="teal"] {
+  --background: hsl(190 45% 6%);
+  --surface: hsl(189 38% 10%);
+  --surface-raised: hsl(188 32% 15%);
+  --foreground: hsl(184 25% 97%);
+  --muted: hsl(184 12% 66%);
+  --border: hsl(184 70% 60% / 0.15);
+  --border-strong: hsl(184 75% 62% / 0.28);
+  --accent: hsl(176 78% 52%);
+  --accent-strong: hsl(186 90% 64%);
+  --accent-ink: hsl(184 60% 8%);
+  --glow: hsl(178 80% 50% / 0.4);
+  --ring: hsl(178 80% 52% / 0.5);
+  color-scheme: dark;
+}
+
+[data-theme="lime"] {
+  --background: hsl(80 22% 6%);
+  --surface: hsl(80 20% 9%);
+  --surface-raised: hsl(80 17% 14%);
+  --foreground: hsl(78 25% 96%);
+  --muted: hsl(78 10% 64%);
+  --border: hsl(78 60% 60% / 0.13);
+  --border-strong: hsl(78 65% 62% / 0.24);
+  --accent: hsl(80 85% 58%);
+  --accent-strong: hsl(68 92% 64%);
+  --accent-ink: hsl(80 60% 8%);
+  --glow: hsl(80 85% 55% / 0.36);
+  --ring: hsl(80 85% 58% / 0.5);
+  color-scheme: dark;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);
