@@ -21,6 +21,9 @@ export default function Header() {
           <Link href="/#triggers" className="transition-colors hover:text-foreground">
             Triggers
           </Link>
+          <Link href="/#faq" className="transition-colors hover:text-foreground">
+            FAQ
+          </Link>
           <a
             href="https://github.com/pork1977/lookout"
             className="transition-colors hover:text-foreground"

@@ -19,10 +19,27 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const title = "Lookout: teach your camera to notice anything";
+const description =
+  "Build a custom detector that watches your webcam and reacts when it sees something specific. You describe it, add example photos, and train it in the browser.";
+
 export const metadata: Metadata = {
-  title: "Lookout: teach your camera to notice anything",
-  description:
-    "Build a custom detector that watches your webcam and reacts when it sees something specific. You describe it, add example photos, and train it in the browser.",
+  metadataBase: new URL("https://lookout.vision"),
+  title,
+  description,
+  alternates: { canonical: "/" },
+  openGraph: {
+    title,
+    description,
+    url: "/",
+    siteName: "Lookout",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title,
+    description,
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
