@@ -33,6 +33,13 @@ export interface DetectorRecord {
   exampleCount: number;
   /** True once a model has been trained and saved for this detector. */
   hasModel?: boolean;
+  /**
+   * The class ids, in order, the saved model was trained on. A model only
+   * makes sense against the groups it learned, so reopening checks these still
+   * match before trusting it.
+   */
+  modelClassIds?: string[];
+  modelAccuracy?: number;
 }
 
 export interface ExampleRecord {

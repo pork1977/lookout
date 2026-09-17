@@ -205,6 +205,23 @@ export async function predict(head: TrainedHead, embedding: Embedding): Promise<
   }
 }
 
+/** Writes a trained head somewhere tf.io understands, e.g. an indexeddb:// url. */
+export async function saveHead(head: TrainedHead, url: string): Promise<void> {
+  await getTf();
+  await head.model.save(url);
+}
+
+/** Reads back a head written by saveHead. */
+export async function loadHead(
+  url: string,
+  classIds: string[],
+  finalAccuracy: number,
+): Promise<TrainedHead> {
+  const tf = await getTf();
+  const model = await tf.loadLayersModel(url);
+  return { model, classIds, finalAccuracy };
+}
+
 export function disposeHead(head: TrainedHead | null) {
   head?.model.dispose();
 }

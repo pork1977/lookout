@@ -9,7 +9,7 @@ import TriggersStep from "./TriggersStep";
 import { MAX_CLASSES, MIN_CLASSES, type DetectorClass, type ExampleImage } from "./types";
 import AccountPanel from "./AccountPanel";
 import DetectorLibrary from "./DetectorLibrary";
-import { disposeHead, type TrainedHead } from "@/lib/trainer";
+import { disposeHead, loadHead, saveHead, type TrainedHead } from "@/lib/trainer";
 import * as store from "@/lib/detectorStore";
 import type { Preset } from "@/lib/presets";
 
@@ -51,10 +51,10 @@ export default function BuildWizard() {
   const headRef = useRef<TrainedHead | null>(null);
   const nextId = useRef(0);
 
-  const adoptHead = useCallback((next: TrainedHead) => {
+  const setActiveHead = useCallback((next: TrainedHead | null) => {
     // A retrain replaces the model; freeing the old one keeps its weights from
     // sitting on the GPU for the rest of the session.
-    disposeHead(headRef.current);
+    if (headRef.current !== next) disposeHead(headRef.current);
     headRef.current = next;
     setHead(next);
   }, []);
@@ -115,9 +115,40 @@ export default function BuildWizard() {
       updatedAt: Date.now(),
       exampleCount: cls.reduce((n, c) => n + c.examples.length, 0),
       hasModel: existing?.hasModel ?? false,
+      modelClassIds: existing?.modelClassIds,
+      modelAccuracy: existing?.modelAccuracy,
     });
     setSavedAt(Date.now());
   }, []);
+
+  /**
+   * Keeps a freshly trained model, and saves it beside the photos so a refresh
+   * or reopening the detector doesn't cost another training run. Saving is
+   * best effort: if it fails the model still works for this session.
+   */
+  const adoptHead = useCallback(
+    (next: TrainedHead) => {
+      setActiveHead(next);
+      const id = stateRef.current.detectorId;
+      if (!id) return;
+      void (async () => {
+        await saveHead(next, store.modelUrl(id));
+        await persistMeta();
+        const record = await store.getDetector(id);
+        if (!record) return;
+        await store.saveDetector({
+          ...record,
+          hasModel: true,
+          modelClassIds: next.classIds,
+          modelAccuracy: next.finalAccuracy,
+        });
+        setSavedAt(Date.now());
+      })().catch(() => {
+        /* storage full or blocked; the model still works until the tab closes */
+      });
+    },
+    [setActiveHead, persistMeta],
+  );
 
   const scheduleSave = useCallback(() => {
     if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
@@ -244,9 +275,7 @@ export default function BuildWizard() {
       // URLs, and a trained model that no longer matches the incoming classes.
       urlsRef.current.forEach((url) => URL.revokeObjectURL(url));
       urlsRef.current.clear();
-      disposeHead(headRef.current);
-      headRef.current = null;
-      setHead(null);
+      setActiveHead(null);
 
       const record = await store.getDetector(id);
       if (!record) return;
@@ -269,16 +298,33 @@ export default function BuildWizard() {
       setActiveClassId(record.classes[0]?.id ?? "class-a");
       setStep(0);
       setSavedAt(Date.now());
+
+      // Bring the trained model back too, but only if it was trained on exactly
+      // these groups. A model from before a group was added would score the
+      // wrong list.
+      const ids = record.classes.map((c) => c.id);
+      const matches =
+        record.hasModel &&
+        record.modelClassIds?.length === ids.length &&
+        record.modelClassIds.every((cid, i) => cid === ids[i]);
+      if (matches) {
+        try {
+          const restored = await loadHead(store.modelUrl(id), ids, record.modelAccuracy ?? 0);
+          // Another detector may have been opened while this one loaded.
+          if (stateRef.current.detectorId === id) setActiveHead(restored);
+          else disposeHead(restored);
+        } catch {
+          /* saved model missing or unreadable; training again fixes it */
+        }
+      }
     },
-    [trackUrl],
+    [trackUrl, setActiveHead],
   );
 
   const createDetector = useCallback(() => {
     urlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     urlsRef.current.clear();
-    disposeHead(headRef.current);
-    headRef.current = null;
-    setHead(null);
+    setActiveHead(null);
 
     const id = `det-${Date.now().toString(36)}`;
     setDetectorId(id);
@@ -289,7 +335,7 @@ export default function BuildWizard() {
     setActiveClassId("class-a");
     setStep(0);
     setSavedAt(Date.now());
-  }, []);
+  }, [setActiveHead]);
 
   /**
    * On first paint: reopen the detector that was last open, or mint a new id.
