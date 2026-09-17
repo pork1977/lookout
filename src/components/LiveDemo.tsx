@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CameraTile from "./live-demo/CameraTile";
 import CameraPicker from "./live-demo/CameraPicker";
 import DetectionList from "./live-demo/DetectionList";
-import SharperToggle from "./live-demo/SharperToggle";
 import { useMediaDevices } from "@/lib/useMediaDevices";
 import { useThemeColor } from "@/lib/useThemeColor";
 import type { DetectionGroup, TrackedDetection } from "./live-demo/types";
@@ -174,10 +173,7 @@ export default function LiveDemo() {
   return (
     <div className="w-full">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          {picker}
-          <SharperToggle />
-        </div>
+        {picker}
         {/* Always available, whatever the camera is doing, it used to appear
             only once a stream was running, which made it feel like it came and
             went. */}
@@ -257,7 +253,6 @@ export default function LiveDemo() {
               <div className="flex flex-wrap items-center gap-3">
                 <span className="text-sm font-semibold text-foreground">Live detection</span>
                 {picker}
-                <SharperToggle showHint />
               </div>
               <button
                 onClick={closeExpand}

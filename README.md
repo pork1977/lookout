@@ -26,7 +26,7 @@ The homepage also has a live demo that recognises around 80 everyday objects wit
 - **Training runs in your browser.** A frozen [MobileNet v2](https://github.com/tensorflow/tfjs-models/tree/master/mobilenet) turns each photo into a 1280-number fingerprint, and a small two-layer classifier is trained on those with [TensorFlow.js](https://www.tensorflow.org/js). This is transfer learning, the same idea behind Google's Teachable Machine: seconds of work on the GPU you already have, no server, no upload.
 - **"What it's looking at"** is a class activation map that costs almost nothing. MobileNet's fingerprint is the average of a 7×7 grid of regional features, so Lookout reads the grid, averages it for the normal prediction, and also runs the classifier on each region to see which ones look like the group. If the model internals it relies on aren't available, the switch simply hides.
 - **Triggers are smoothed, not twitchy.** Scores are averaged over roughly a second, a condition has to hold for a dwell time before firing, and a cooldown stops repeats. With several cameras, each one votes yes, no, or abstains (when it's unsure, say it can only see half of you), so "I've left my desk" doesn't fire while another camera can still see you.
-- **The live demo** uses [COCO-SSD](https://github.com/tensorflow/tfjs-models/tree/master/coco-ssd), starting on a small model and upgrading to a more accurate one in the background. *Sharper detection* hands the work to Google's [MediaPipe](https://ai.google.dev/edge/mediapipe/solutions/vision/object_detector) EfficientDet-Lite0, an extra 7MB download, and drops back to COCO-SSD automatically if a device can't run it.
+- **The live demo** uses Google's [MediaPipe](https://ai.google.dev/edge/mediapipe/solutions/vision/object_detector) object detector (EfficientDet-Lite0) on the GPU, falling back to the CPU where a GPU won't cooperate. It replaced TensorFlow.js COCO-SSD, which was worse at small and distant objects and needed about 85MB of downloads to reach its best model, against about 10MB here. The WebAssembly runtime is served from the site itself, copied out of the installed package at build time.
 - **Labelling help** sends only the photos you ask it to check to Claude (Haiku 4.5), with structured output so every answer maps back to a real photo.
 - **Anything that leaves the browser** (Slack, Discord, webhooks, email) goes through a server route, so webhook URLs and keys never sit in the page. Webhooks must be https, and addresses that resolve to private or reserved networks are refused.
 - **Run links** store the trained classifier at 8 bits per weight (about 170KB, within 1% of the original's confidence). Anyone can fetch one share by its random link through a single database function, but nobody can list them, and only the owner can change or remove one.
@@ -60,7 +60,7 @@ If you use accounts, apply the migrations in [`supabase/migrations`](supabase/mi
 ## Stack
 
 - [Next.js](https://nextjs.org) (App Router, TypeScript, Tailwind) on [Vercel](https://vercel.com)
-- [TensorFlow.js](https://www.tensorflow.org/js) with MobileNet and COCO-SSD, plus [MediaPipe Tasks](https://ai.google.dev/edge/mediapipe) as an option
+- [TensorFlow.js](https://www.tensorflow.org/js) with MobileNet for training, and [MediaPipe Tasks](https://ai.google.dev/edge/mediapipe) for the live demo
 - [Claude](https://www.anthropic.com/claude) via the Anthropic SDK for labelling
 - [Supabase](https://supabase.com) for auth, Postgres and storage
 - IndexedDB for on-device persistence

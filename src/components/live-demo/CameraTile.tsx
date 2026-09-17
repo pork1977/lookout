@@ -1,9 +1,12 @@
 "use client";
 
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import type { DetectedObject } from "@tensorflow-models/coco-ssd";
-import { ADMIT_SCORE, detect, detectorQuality, startDetector } from "@/lib/detectorModel";
-import { useDetectorEngine } from "./SharperToggle";
+import {
+  ADMIT_SCORE,
+  detect,
+  startDetector,
+  type DetectedObject,
+} from "@/lib/detectorModel";
 import { inkFor } from "@/lib/colorInk";
 import { classifyCameraError, openCameraStream } from "@/lib/cameraStream";
 import type { TrackedDetection } from "./types";
@@ -106,26 +109,12 @@ function CameraTile({
 
   const [status, setStatus] = useState<TileStatus>("idle");
   const [liveCount, setLiveCount] = useState(0);
-  const [quality, setQuality] = useState<"fast" | "accurate">("fast");
   /**
    * `autoStart` means "start on mount", and it was also standing in for "this
    * tile is never started by hand", which left a stopped grid camera with no
    * way back, showing "waiting for permission" forever. This splits the two.
    */
   const [everStarted, setEverStarted] = useState(false);
-  const detectorEngine = useDetectorEngine();
-
-  // The detector starts on the small base and swaps itself for the accurate one
-  // a few seconds later. Polling for that is worth the handful of lines: without
-  // it, someone judging detection quality has no way to tell which model just
-  // answered, and would be judging the warm-up model.
-  useEffect(() => {
-    if (status !== "running" || quality === "accurate") return;
-    const id = window.setInterval(() => {
-      if (detectorQuality() === "accurate") setQuality("accurate");
-    }, 1000);
-    return () => window.clearInterval(id);
-  }, [status, quality]);
 
   useEffect(() => {
     compactRef.current = compact;
@@ -607,15 +596,6 @@ function CameraTile({
 
         {status === "running" && (
           <div className="flex shrink-0 items-center" style={{ gap: "0.4em" }}>
-            {quality === "fast" && detectorEngine.engine === "standard" && (
-              <span
-                title="Running the quick model while the more accurate one finishes downloading."
-                className={`${chip} animate-scan-pulse text-muted`}
-                style={chipPad}
-              >
-                refining
-              </span>
-            )}
             <span className={`${chip} whitespace-nowrap text-muted`} style={chipPad}>
               {liveCount > 0 ? `${liveCount} tracked` : "watching"}
             </span>

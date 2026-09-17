@@ -12,6 +12,7 @@ import {
 import { getSupabase } from "@/lib/supabaseClient";
 import type { TrainedHead } from "@/lib/trainer";
 import type { TriggerSettings } from "@/lib/triggerSettings";
+import { OPEN_ACCOUNT_EVENT } from "./AccountPanel";
 import type { DetectorClass } from "./types";
 
 const ACTION_LABELS: Record<string, string> = {
@@ -137,10 +138,19 @@ export default function DeployStep({
     body = <p className="text-sm text-muted">Checking your account…</p>;
   } else if (!user) {
     body = (
-      <p className="text-sm leading-relaxed text-muted">
-        Sign in under <span className="text-foreground">Account</span> at the top of the page to
-        share. Anyone you send the link to can open it without an account.
-      </p>
+      <div className="space-y-4">
+        <p className="text-sm leading-relaxed text-muted">
+          Creating a link needs you to be signed in, so the link has an owner who can update or
+          stop it. Anyone you send it to can open it without an account.
+        </p>
+        <button
+          onClick={() => window.dispatchEvent(new Event(OPEN_ACCOUNT_EVENT))}
+          className="rounded-full px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_10px_30px_-8px_var(--glow)] transition-transform hover:scale-[1.02]"
+          style={{ backgroundImage: "linear-gradient(135deg, var(--accent), var(--accent-strong))" }}
+        >
+          Sign in to share
+        </button>
+      </div>
     );
   } else {
     body = (

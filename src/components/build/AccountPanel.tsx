@@ -15,6 +15,8 @@ import {
 import * as store from "@/lib/detectorStore";
 import ProgressBar from "./ProgressBar";
 
+export const OPEN_ACCOUNT_EVENT = "lookout:open-account";
+
 export default function AccountPanel({
   currentDetectorId,
   onRestored,
@@ -47,6 +49,17 @@ export default function AccountPanel({
     });
     return () => sub.subscription.unsubscribe();
   }, [supabase]);
+
+  // Other steps (Deploy) can ask for the panel instead of telling people to
+  // go and find it.
+  useEffect(() => {
+    function openFromElsewhere() {
+      setOpen(true);
+      rootRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    window.addEventListener(OPEN_ACCOUNT_EVENT, openFromElsewhere);
+    return () => window.removeEventListener(OPEN_ACCOUNT_EVENT, openFromElsewhere);
+  }, []);
 
   const refreshCloud = useCallback(() => {
     if (!user) return;
