@@ -62,4 +62,4 @@ If you use accounts, apply the migrations in [`supabase/migrations`](supabase/mi
 - [Claude](https://www.anthropic.com/claude) via the Anthropic SDK for labelling
 - [Supabase](https://supabase.com) for auth, Postgres and storage
 - IndexedDB for on-device persistence
-- Built with [Claude Code](https://www.anthropic.com/claude-code)
+- Built with [Claude Code](https://www.anthropic.com/claude-code) (guided and reviewed by me!)
