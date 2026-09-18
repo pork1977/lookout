@@ -99,7 +99,16 @@ export default function TriggersStep({
       onSettingsChange((s) => ({ ...s, rule: update(s.rule) })),
     [onSettingsChange],
   );
-  const setClassId = useCallback((id: string) => setRule((r) => ({ ...r, classId: id })), [setRule]);
+  const setClassId = useCallback(
+    (id: string) =>
+      setRule((r) => ({
+        ...r,
+        classId: id,
+        // Can't require a group to have seen itself first.
+        requireAfterClassId: r.requireAfterClassId === id ? undefined : r.requireAfterClassId,
+      })),
+    [setRule],
+  );
   const setTemplate = useCallback(
     (next: string) => onSettingsChange((s) => ({ ...s, template: next })),
     [onSettingsChange],
@@ -130,7 +139,12 @@ export default function TriggersStep({
   useEffect(() => {
     attentionOnRef.current = attention.on;
   }, [attention.on]);
-  const [engineState, setEngineState] = useState<{ held: number; condition: boolean; cooling: boolean } | null>(null);
+  const [engineState, setEngineState] = useState<{
+    held: number;
+    condition: boolean;
+    cooling: boolean;
+    armed: boolean;
+  } | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
   const [notifyPermission, setNotifyPermission] = useState<NotificationPermission | "unsupported">("default");
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -144,6 +158,10 @@ export default function TriggersStep({
   const videosRef = useRef(new Map<string, HTMLVideoElement>());
   const nextUid = useRef(0);
   const camerasRef = useRef(cameras);
+  // Read inside the prediction loop so a changed gate class is picked up on
+  // the next tick without restarting the loop, the same reasoning that keeps
+  // `rule` itself out of the loop effect's dependencies below.
+  const ruleRef = useRef(rule);
   const statusRef = useRef<Record<string, WatchStatus>>({});
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const timerRef = useRef<number | null>(null);
@@ -290,7 +308,8 @@ export default function TriggersStep({
   // Keep the engine's rule current without rebuilding it, so changing a dwell
   // mid-watch doesn't throw away the time already accumulated.
   useEffect(() => {
-    engineRef.current?.setRule({ ...rule, classId });
+    ruleRef.current = { ...rule, classId };
+    engineRef.current?.setRule(ruleRef.current);
   }, [rule, classId]);
 
   useEffect(() => {
@@ -309,7 +328,11 @@ export default function TriggersStep({
         // One reading per running camera, taken in turn through the same
         // canvas. The engine decides what several readings add up to.
         const readings: CameraReading[] = [];
+        const gateReadings: CameraReading[] = [];
         const maps: Record<string, Float32Array> = {};
+        // The classifier already scores every group each frame, so reading a
+        // second one for the gate costs nothing extra.
+        const gateIndex = classes.findIndex((c) => c.id === ruleRef.current.requireAfterClassId);
         for (const { uid } of camerasRef.current) {
           if (statusRef.current[uid] !== "running") continue;
           const video = videosRef.current.get(uid);
@@ -318,6 +341,7 @@ export default function TriggersStep({
             drawFrameForInference(video, canvas);
             const reading = await readFrame(head, canvas, attentionOnRef.current);
             readings.push({ cameraId: uid, score: reading.probabilities[classIndex] });
+            if (gateIndex >= 0) gateReadings.push({ cameraId: uid, score: reading.probabilities[gateIndex] });
             if (reading.maps) maps[uid] = reading.maps[classIndex];
           } catch {
             /* one camera dropping a frame shouldn't cost the others theirs */
@@ -326,8 +350,8 @@ export default function TriggersStep({
         }
         if (readings.length === 0) return;
 
-        const state = engine.update(readings, Date.now());
-        setEngineState({ held: state.heldMs, condition: state.condition, cooling: state.cooling });
+        const state = engine.update(readings, Date.now(), gateIndex >= 0 ? gateReadings : undefined);
+        setEngineState({ held: state.heldMs, condition: state.condition, cooling: state.cooling, armed: state.armed });
         setLive({ scores: state.scores, seeing: state.seeing, maps });
         if (state.fired) {
           const seen = readings.filter((r) => state.seeing.includes(r.cameraId));
@@ -436,6 +460,72 @@ export default function TriggersStep({
                 hint="Without a cooldown it would fire on every frame for as long as the condition holds."
               />
             </div>
+
+            {/* Only meaningful with a second group to require. With one group
+                total there's nothing to have seen first. */}
+            {classes.length > 1 && (
+              <div className="mt-6 border-t border-border pt-6">
+                <span className="text-xs font-semibold text-foreground">Only after it saw</span>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setRule((r) => ({ ...r, requireAfterClassId: undefined }))}
+                    className="rounded-full border px-3.5 py-1.5 text-xs transition-colors"
+                    style={{
+                      borderColor: !rule.requireAfterClassId ? "var(--accent)" : "var(--border-strong)",
+                      background: !rule.requireAfterClassId ? "var(--surface-raised)" : "transparent",
+                      color: !rule.requireAfterClassId ? "var(--accent)" : "var(--foreground)",
+                    }}
+                  >
+                    Nothing in particular
+                  </button>
+                  {classes
+                    .filter((cls) => cls.id !== classId)
+                    .map((cls) => {
+                      const selected = rule.requireAfterClassId === cls.id;
+                      return (
+                        <button
+                          key={cls.id}
+                          onClick={() => setRule((r) => ({ ...r, requireAfterClassId: cls.id }))}
+                          className="rounded-full border px-3.5 py-1.5 text-xs transition-colors"
+                          style={{
+                            borderColor: selected ? "var(--accent)" : "var(--border-strong)",
+                            background: selected ? "var(--surface-raised)" : "transparent",
+                            color: selected ? "var(--accent)" : "var(--foreground)",
+                          }}
+                        >
+                          {cls.name || "Untitled group"}
+                        </button>
+                      );
+                    })}
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-muted">
+                  {rule.requireAfterClassId
+                    ? `Arms once it's seen "${
+                        classes.find((c) => c.id === rule.requireAfterClassId)?.name || "Untitled group"
+                      }", then fires the next time the condition above holds. After that it needs to see "${
+                        classes.find((c) => c.id === rule.requireAfterClassId)?.name || "Untitled group"
+                      }" again before it can fire once more, however long you stay in view. Use this for “notice when I come back”, rather than “notice repeatedly while I'm here”.`
+                    : "Fires whenever the condition above holds, and again every cooldown for as long as it keeps holding. Pick a group here to make it fire once per visit instead of repeating."}
+                </p>
+                {rule.requireAfterClassId && (
+                  <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-xl border border-transparent px-1 py-1.5 transition-colors hover:border-border hover:bg-surface-raised">
+                    <input
+                      type="checkbox"
+                      checked={rule.startArmed}
+                      onChange={(e) => setRule((r) => ({ ...r, startArmed: e.target.checked }))}
+                      className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
+                    />
+                    <span className="text-xs leading-relaxed text-muted">
+                      <span className="text-foreground">Allow it to fire right away</span> the first
+                      time watching starts, without waiting to see &ldquo;
+                      {classes.find((c) => c.id === rule.requireAfterClassId)?.name || "Untitled group"}
+                      &rdquo; first. Off by default, so a fresh start doesn&apos;t count as an arrival on
+                      its own.
+                    </span>
+                  </label>
+                )}
+              </div>
+            )}
 
             {/* Only meaningful with two or more cameras. With one, "any" and
                 "every" are the same rule, so showing the choice would just be
@@ -732,9 +822,13 @@ export default function TriggersStep({
                   ? "Set your conditions, then start watching."
                   : engineState?.cooling
                     ? "Just fired, holding off for the cooldown."
-                    : engineState?.condition
-                      ? `Holding, ${(engineState.held / 1000).toFixed(1)}s of ${rule.dwellSeconds}s`
-                      : "Waiting to see it."}
+                    : rule.requireAfterClassId && !engineState?.armed
+                      ? `Waiting to see "${
+                          classes.find((c) => c.id === rule.requireAfterClassId)?.name || "Untitled group"
+                        }" first.`
+                      : engineState?.condition
+                        ? `Holding, ${(engineState.held / 1000).toFixed(1)}s of ${rule.dwellSeconds}s`
+                        : "Waiting to see it."}
               </p>
             </div>
 

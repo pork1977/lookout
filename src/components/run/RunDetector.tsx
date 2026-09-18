@@ -50,7 +50,12 @@ export default function RunDetector({ slug }: { slug: string }) {
   const [scores, setScores] = useState<number[] | null>(null);
   const [maps, setMaps] = useState<Float32Array[] | null>(null);
   const [watchScore, setWatchScore] = useState<number | null>(null);
-  const [engineState, setEngineState] = useState<{ held: number; condition: boolean; cooling: boolean } | null>(null);
+  const [engineState, setEngineState] = useState<{
+    held: number;
+    condition: boolean;
+    cooling: boolean;
+    armed: boolean;
+  } | null>(null);
   const [actions, setActions] = useState<Set<ClientActionId>>(new Set());
   const [banner, setBanner] = useState<string | null>(null);
   const [log, setLog] = useState<Array<{ at: string; text: string }>>([]);
@@ -109,6 +114,10 @@ export default function RunDetector({ slug }: { slug: string }) {
     ? Math.max(0, detector.groups.findIndex((g) => g.id === detector.settings.rule.classId))
     : 0;
   const watched = detector?.groups[watchIndex];
+  const gateIndex = detector
+    ? detector.groups.findIndex((g) => g.id === detector.settings.rule.requireAfterClassId)
+    : -1;
+  const gateGroup = gateIndex >= 0 ? detector?.groups[gateIndex] : undefined;
 
   const fireRef = useRef<(confidence: number) => void>(() => {});
   useEffect(() => {
@@ -160,9 +169,10 @@ export default function RunDetector({ slug }: { slug: string }) {
           const state = engine.update(
             [{ cameraId: CAMERA_ID, score: reading.probabilities[watchIndex] }],
             Date.now(),
+            gateIndex >= 0 ? [{ cameraId: CAMERA_ID, score: reading.probabilities[gateIndex] }] : undefined,
           );
           setWatchScore(state.scores[CAMERA_ID] ?? null);
-          setEngineState({ held: state.heldMs, condition: state.condition, cooling: state.cooling });
+          setEngineState({ held: state.heldMs, condition: state.condition, cooling: state.cooling, armed: state.armed });
           if (state.fired) fireRef.current(reading.probabilities[watchIndex]);
         }
       } catch {
@@ -176,7 +186,7 @@ export default function RunDetector({ slug }: { slug: string }) {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [detector, cameraRunning, watchIndex]);
+  }, [detector, cameraRunning, watchIndex, gateIndex]);
 
   const toggleArmed = useCallback(async () => {
     if (!detector) return;
@@ -360,6 +370,13 @@ export default function RunDetector({ slug }: { slug: string }) {
               <span className="text-accent">{watched?.name || "Untitled group"}</span> for{" "}
               {detector.settings.rule.dwellSeconds}s, then waits{" "}
               {detector.settings.rule.cooldownSeconds}s before reacting again.
+              {gateGroup && (
+                <>
+                  {" "}
+                  Only fires after it&apos;s first seen{" "}
+                  <span className="text-accent">{gateGroup.name || "Untitled group"}</span>.
+                </>
+              )}
             </p>
             <div className="mt-4">
               <ProgressBar value={dwellProgress} active={!!engineState?.condition} />
@@ -368,9 +385,11 @@ export default function RunDetector({ slug }: { slug: string }) {
                   ? "Start watching when you're ready. Keep this tab open and in front."
                   : engineState?.cooling
                     ? "Just fired, holding off for the cooldown."
-                    : engineState?.condition
-                      ? `Holding, ${(engineState.held / 1000).toFixed(1)}s of ${detector.settings.rule.dwellSeconds}s`
-                      : "Waiting to see it."}
+                    : gateGroup && !engineState?.armed
+                      ? `Waiting to see "${gateGroup.name || "Untitled group"}" first.`
+                      : engineState?.condition
+                        ? `Holding, ${(engineState.held / 1000).toFixed(1)}s of ${detector.settings.rule.dwellSeconds}s`
+                        : "Waiting to see it."}
               </p>
             </div>
 

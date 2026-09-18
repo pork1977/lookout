@@ -49,6 +49,28 @@ export interface TriggerRule {
   /** Minimum gap between fires, so one condition doesn't fire once per frame. */
   cooldownSeconds: number;
   combine: CombineRule;
+  /**
+   * Turns repeat firing off in favour of once-per-visit. Unset (the default):
+   * the rule above fires again every cooldown for as long as the condition
+   * keeps holding, which is right for "someone walked up behind me" but wrong
+   * for "I've come back to my desk", where sitting there for 20 minutes would
+   * otherwise fire every cooldown the whole time.
+   *
+   * Set to another class's id, and firing needs that class to have been seen
+   * since the last fire: it "arms" the watched class, and firing "disarms" it
+   * again. So "at my desk", armed by "away", fires once on arrival and stays
+   * quiet through anything else (leaning back, a call, whatever) until it
+   * sees "away" again.
+   */
+  requireAfterClassId?: string;
+  /**
+   * Only meaningful with requireAfterClassId set. Whether the rule starts
+   * already armed (can fire the first time the watched class is seen, with
+   * no prior sighting of the arming class in this session) or disarmed
+   * (must see the arming class at least once before it can fire at all).
+   * Defaults to disarmed: a fresh start shouldn't count as an arrival.
+   */
+  startArmed: boolean;
 }
 
 export const DEFAULT_RULE: Omit<TriggerRule, "classId"> = {
@@ -57,6 +79,7 @@ export const DEFAULT_RULE: Omit<TriggerRule, "classId"> = {
   dwellSeconds: 2,
   cooldownSeconds: 60,
   combine: "any",
+  startArmed: false,
 };
 
 /** Smoothing constant: how much weight a new frame carries. Roughly a 1s window at 8Hz. */
@@ -85,27 +108,46 @@ export interface EngineState {
   unknown: boolean;
   /** Each live camera's smoothed score, which is what the votes were taken on. */
   scores: Record<string, number>;
+  /**
+   * Only meaningful when the rule has a requireAfterClassId. True once the
+   * arming class has been seen and the watched class is free to fire; false
+   * while it's waiting to see the arming class again.
+   */
+  armed: boolean;
 }
 
 export class TriggerEngine {
   private smoothed = new Map<string, number>();
+  private gateSmoothed = new Map<string, number>();
   private condition = false;
   private heldMs = 0;
   private lastTick: number | null = null;
   private lastFiredAt: number | null = null;
+  private armed: boolean;
 
-  constructor(private rule: TriggerRule) {}
+  constructor(private rule: TriggerRule) {
+    this.armed = !rule.requireAfterClassId || rule.startArmed;
+  }
 
   setRule(rule: TriggerRule) {
+    // Only reset the arming state when the gate itself changes shape (added,
+    // removed, or pointed at a different class). Tuning the dwell or cooldown
+    // mid-watch shouldn't throw away an arm that's already been earned, the
+    // same reasoning that already applies to the dwell clock below.
+    if (rule.requireAfterClassId !== this.rule.requireAfterClassId) {
+      this.armed = !rule.requireAfterClassId || rule.startArmed;
+    }
     this.rule = rule;
   }
 
   reset() {
     this.smoothed.clear();
+    this.gateSmoothed.clear();
     this.condition = false;
     this.heldMs = 0;
     this.lastTick = null;
     this.lastFiredAt = null;
+    this.armed = !this.rule.requireAfterClassId || this.rule.startArmed;
   }
 
   private vote(score: number): Vote {
@@ -117,7 +159,13 @@ export class TriggerEngine {
     return "abstain";
   }
 
-  update(readings: CameraReading[], now: number): EngineState {
+  /**
+   * `gateReadings` is only read when the rule has a requireAfterClassId: one
+   * reading per camera for that other class, taken from the same frame as
+   * `readings`. Passing it when there's no gate, or omitting it when there
+   * is, is harmless either way; the gate just can't arm without it.
+   */
+  update(readings: CameraReading[], now: number, gateReadings?: CameraReading[]): EngineState {
     const elapsed = this.lastTick === null ? 0 : Math.max(0, now - this.lastTick);
     this.lastTick = now;
 
@@ -164,15 +212,46 @@ export class TriggerEngine {
     }
     this.condition = condition;
 
+    if (this.rule.requireAfterClassId && gateReadings?.length) {
+      const gateVotes = gateReadings.map((reading) => {
+        const previous = this.gateSmoothed.get(reading.cameraId);
+        const value =
+          previous === undefined ? reading.score : previous + SMOOTHING * (reading.score - previous);
+        this.gateSmoothed.set(reading.cameraId, value);
+        return this.vote(value);
+      });
+      const gateLive = new Set(gateReadings.map((r) => r.cameraId));
+      for (const id of [...this.gateSmoothed.keys()]) if (!gateLive.has(id)) this.gateSmoothed.delete(id);
+
+      const gateYes = gateVotes.filter((v) => v === "yes").length;
+      const gateNo = gateVotes.filter((v) => v === "no").length;
+      const gateSeen = this.rule.combine === "any" ? gateYes > 0 : gateYes > 0 && gateNo === 0;
+      // Arming only ever turns on here; firing is what turns it back off,
+      // below. A camera that briefly loses the arming class shouldn't
+      // un-arm something already earned.
+      if (gateSeen) this.armed = true;
+    }
+
     const cooling =
       this.lastFiredAt !== null && now - this.lastFiredAt < this.rule.cooldownSeconds * 1000;
 
     let fired = false;
-    if (condition && this.heldMs >= this.rule.dwellSeconds * 1000 && !cooling) {
+    const gateOpen = !this.rule.requireAfterClassId || this.armed;
+    if (condition && this.heldMs >= this.rule.dwellSeconds * 1000 && !cooling && gateOpen) {
       fired = true;
       this.lastFiredAt = now;
+      if (this.rule.requireAfterClassId) this.armed = false;
     }
 
-    return { condition, heldMs: this.heldMs, fired, seeing, cooling: cooling && !fired, unknown, scores };
+    return {
+      condition,
+      heldMs: this.heldMs,
+      fired,
+      seeing,
+      cooling: cooling && !fired,
+      unknown,
+      scores,
+      armed: this.armed,
+    };
   }
 }

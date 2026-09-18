@@ -43,18 +43,29 @@ export function sanitizeTriggerSettings(raw: unknown, classIds: string[]): Trigg
   const input = raw as Partial<TriggerSettings>;
   const rule = (input.rule ?? {}) as Partial<TriggerRule>;
   const threshold = clamp(rule.threshold, 0.05, 1, DEFAULT_RULE.threshold);
+  const classId =
+    typeof rule.classId === "string" && classIds.includes(rule.classId)
+      ? rule.classId
+      : fallback.rule.classId;
+  // Can't require a class to arm itself, and can't require a class that no
+  // longer exists (the group may have been deleted since this was saved).
+  const requireAfterClassId =
+    typeof rule.requireAfterClassId === "string" &&
+    rule.requireAfterClassId !== classId &&
+    classIds.includes(rule.requireAfterClassId)
+      ? rule.requireAfterClassId
+      : undefined;
 
   return {
     rule: {
-      classId:
-        typeof rule.classId === "string" && classIds.includes(rule.classId)
-          ? rule.classId
-          : fallback.rule.classId,
+      classId,
       threshold,
       releaseThreshold: Math.min(threshold, clamp(rule.releaseThreshold, 0, 1, DEFAULT_RULE.releaseThreshold)),
       dwellSeconds: clamp(rule.dwellSeconds, 0, 3600, DEFAULT_RULE.dwellSeconds),
       cooldownSeconds: clamp(rule.cooldownSeconds, 0, 86400, DEFAULT_RULE.cooldownSeconds),
       combine: rule.combine === "all" ? "all" : "any",
+      ...(requireAfterClassId ? { requireAfterClassId } : {}),
+      startArmed: typeof rule.startArmed === "boolean" ? rule.startArmed : DEFAULT_RULE.startArmed,
     },
     template:
       typeof input.template === "string" ? input.template.slice(0, 2000) : fallback.template,

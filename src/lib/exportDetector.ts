@@ -72,6 +72,9 @@ export interface ExportMetadata {
     releaseThreshold: number;
     dwellSeconds: number;
     cooldownSeconds: number;
+    /** Unset means fire whenever the condition holds, same as always. */
+    requireAfterLabel?: string;
+    startArmed?: boolean;
   };
   photos: Record<string, { folder: string; count: number; fromCamera: number; uploaded: number }>;
 }
@@ -105,6 +108,9 @@ export function buildExportFiles(input: ExportInput): { folder: string; files: R
   const folder = safeName(input.name, "lookout-detector", new Set());
   const labels = input.groups.map((g, i) => g.name.trim() || `Group ${i + 1}`);
   const watchIndex = Math.max(0, input.groups.findIndex((g) => g.id === input.settings.rule.classId));
+  const requireAfterIndex = input.settings.rule.requireAfterClassId
+    ? input.groups.findIndex((g) => g.id === input.settings.rule.requireAfterClassId)
+    : -1;
 
   const modelJson = {
     format: "layers-model",
@@ -159,6 +165,9 @@ export function buildExportFiles(input: ExportInput): { folder: string; files: R
       releaseThreshold: input.settings.rule.releaseThreshold,
       dwellSeconds: input.settings.rule.dwellSeconds,
       cooldownSeconds: input.settings.rule.cooldownSeconds,
+      ...(requireAfterIndex >= 0
+        ? { requireAfterLabel: labels[requireAfterIndex], startArmed: input.settings.rule.startArmed }
+        : {}),
     },
     photos,
   };

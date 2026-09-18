@@ -138,8 +138,13 @@ export function exportHtml(meta: ExportMetadata): string {
 
       const trigger = metadata.trigger;
       const watchIndex = metadata.labels.indexOf(trigger.watchLabel);
+      const requireAfterIndex = trigger.requireAfterLabel
+        ? metadata.labels.indexOf(trigger.requireAfterLabel)
+        : -1;
       status.textContent =
-        \`Watching for "\${trigger.watchLabel}": \${Math.round(trigger.threshold * 100)}% or more for \${trigger.dwellSeconds}s.\`;
+        requireAfterIndex >= 0
+          ? \`Watching for "\${trigger.watchLabel}": \${Math.round(trigger.threshold * 100)}% or more for \${trigger.dwellSeconds}s, but only once it's first seen "\${trigger.requireAfterLabel}".\`
+          : \`Watching for "\${trigger.watchLabel}": \${Math.round(trigger.threshold * 100)}% or more for \${trigger.dwellSeconds}s.\`;
       startButton.textContent = "Start camera";
       startButton.disabled = false;
 
@@ -172,6 +177,9 @@ export function exportHtml(meta: ExportMetadata): string {
         let heldSince = null;
         let lastFired = 0;
         let busy = false;
+        // See requireAfterLabel below: unset means always armed, i.e. today's
+        // plain repeat-on-a-timer behaviour.
+        let armed = requireAfterIndex < 0 || !!trigger.startArmed;
 
         timer = setInterval(async () => {
           if (busy || video.readyState < 2) return;
@@ -194,14 +202,19 @@ export function exportHtml(meta: ExportMetadata): string {
 
           // A simple version of Lookout's trigger: the watched label has to
           // stay above the threshold for the dwell time, then waits for the
-          // cooldown before it can fire again.
+          // cooldown before it can fire again. When requireAfterLabel is set,
+          // it also has to have been "armed" by seeing that other label since
+          // the last fire, so it fires once per visit rather than repeating
+          // for as long as it stays in view.
           const now = Date.now();
+          if (requireAfterIndex >= 0 && scores[requireAfterIndex] >= trigger.threshold) armed = true;
           if (scores[watchIndex] >= trigger.threshold) {
             heldSince ??= now;
             const held = (now - heldSince) / 1000;
             const cooled = now - lastFired >= trigger.cooldownSeconds * 1000;
-            if (held >= trigger.dwellSeconds && cooled) {
+            if (held >= trigger.dwellSeconds && cooled && armed) {
               lastFired = now;
+              if (requireAfterIndex >= 0) armed = false;
               onDetected(metadata.labels[watchIndex], scores[watchIndex]);
             }
           } else if (scores[watchIndex] <= trigger.releaseThreshold) {
