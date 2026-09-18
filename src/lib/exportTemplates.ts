@@ -47,6 +47,13 @@ export function exportHtml(meta: ExportMetadata): string {
       opacity: 0; pointer-events: none; transition: opacity 160ms, transform 160ms; z-index: 50;
     }
     #banner.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #cameraPicker { display: none; margin-top: 14px; }
+    #cameraPicker label { display: block; font-size: 0.8rem; margin-bottom: 4px; }
+    #cameraPicker select {
+      background: #141a17; color: #eef3f0; border: 1px solid #24302b; border-radius: 10px;
+      padding: 8px 10px; font-size: 0.9rem; max-width: 100%;
+    }
+    #cameraPicker p { font-size: 0.8rem; margin: 6px 0 0; }
   </style>
 </head>
 <body>
@@ -55,6 +62,16 @@ export function exportHtml(meta: ExportMetadata): string {
     <h1>${title}</h1>
     <p>A detector exported from Lookout. Everything runs in this page: the webcam feed isn't uploaded anywhere.</p>
     <button id="start" disabled>Loading…</button>
+    <div id="cameraPicker">
+      <label for="cameraSelect">Camera</label>
+      <select id="cameraSelect"></select>
+      <p>
+        Whilst you can change cameras, note that if the photos used to train this model were taken
+        with a different camera, one that sees things from a different angle, distance or light,
+        accuracy may drop. Retrain with photos from the camera you actually plan to use for the best
+        result.
+      </p>
+    </div>
     <div class="layout">
       <video id="camera" playsinline muted></video>
       <div>
@@ -201,6 +218,46 @@ export function exportHtml(meta: ExportMetadata): string {
       canvas.width = canvas.height = INPUT_SIZE;
       let timer = null;
 
+      const cameraPicker = document.getElementById("cameraPicker");
+      const cameraSelect = document.getElementById("cameraSelect");
+      // Set once a camera is actually running, from the stream itself, not
+      // from the picker: on the very first start there's nothing picked yet
+      // and the browser chooses, so this is how the picker finds out what it
+      // chose.
+      let currentDeviceId = null;
+
+      // Labels are blank until permission has been granted at least once, so
+      // this only has anything to show after the first successful start.
+      async function refreshCameraList() {
+        if (!navigator.mediaDevices?.enumerateDevices) return;
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const cams = devices.filter((d) => d.kind === "videoinput");
+        if (cams.length < 2) {
+          cameraPicker.style.display = "none";
+          return;
+        }
+        cameraSelect.textContent = "";
+        cams.forEach((cam, i) => {
+          const option = document.createElement("option");
+          option.value = cam.deviceId;
+          option.textContent = cam.label || \`Camera \${i + 1}\`;
+          cameraSelect.appendChild(option);
+        });
+        if (currentDeviceId) cameraSelect.value = currentDeviceId;
+        cameraPicker.style.display = "block";
+      }
+
+      cameraSelect.addEventListener("change", () => {
+        currentDeviceId = cameraSelect.value;
+        // Switching cameras is a fresh start under the hood, so the dwell
+        // clock, cooldown and arm state all reset, the same as Stop then
+        // Start does today.
+        if (timer) {
+          stop();
+          start();
+        }
+      });
+
       function stop() {
         clearInterval(timer);
         timer = null;
@@ -220,8 +277,14 @@ export function exportHtml(meta: ExportMetadata): string {
           await Notification.requestPermission();
         }
         try {
-          video.srcObject = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: currentDeviceId ? { deviceId: { exact: currentDeviceId } } : true,
+            audio: false,
+          });
+          video.srcObject = stream;
           await video.play();
+          currentDeviceId = stream.getVideoTracks()[0]?.getSettings().deviceId ?? currentDeviceId;
+          await refreshCameraList();
         } catch (err) {
           status.textContent = "Couldn't open the camera: " + err.message;
           startButton.disabled = false;
