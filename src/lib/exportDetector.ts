@@ -1,6 +1,7 @@
 import { strToU8, zipSync, type Zippable } from "fflate";
 import type * as tfTypes from "@tensorflow/tfjs";
 import { exportHtml, exportReadme } from "./exportTemplates";
+import type { ClientActionId, SpeechOptions } from "./triggerActions";
 import type { TriggerSettings } from "./triggerSettings";
 
 /**
@@ -75,6 +76,15 @@ export interface ExportMetadata {
     /** Unset means fire whenever the condition holds, same as always. */
     requireAfterLabel?: string;
     startArmed?: boolean;
+    /**
+     * What to do when it fires. Deliberately only the three that need no
+     * server: Slack, Discord, webhook and email all need a URL or address
+     * that's effectively a secret, and a static export has nowhere safe to
+     * keep one, so those stay app-only.
+     */
+    template: string;
+    clientActions: ClientActionId[];
+    speech: SpeechOptions;
   };
   photos: Record<string, { folder: string; count: number; fromCamera: number; uploaded: number }>;
 }
@@ -168,6 +178,9 @@ export function buildExportFiles(input: ExportInput): { folder: string; files: R
       ...(requireAfterIndex >= 0
         ? { requireAfterLabel: labels[requireAfterIndex], startArmed: input.settings.rule.startArmed }
         : {}),
+      template: input.settings.template,
+      clientActions: input.settings.clientActions,
+      speech: input.settings.speech,
     },
     photos,
   };

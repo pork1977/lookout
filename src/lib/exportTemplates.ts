@@ -39,9 +39,18 @@ export function exportHtml(meta: ExportMetadata): string {
     .leader .bar-label span:first-child { color: #5cf2a3; font-weight: 600; }
     #status { font-size: 0.9rem; }
     #fired { color: #5cf2a3; font-weight: 600; min-height: 1.4em; }
+    #banner {
+      position: fixed; top: 16px; left: 50%; transform: translateX(-50%) translateY(-12px);
+      max-width: min(90vw, 32rem); padding: 14px 20px; border-radius: 16px;
+      background: #141a17; border: 1px solid #24302b; color: #eef3f0; font-weight: 600;
+      text-align: center; box-shadow: 0 20px 60px -20px rgba(92, 242, 163, 0.4);
+      opacity: 0; pointer-events: none; transition: opacity 160ms, transform 160ms; z-index: 50;
+    }
+    #banner.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   </style>
 </head>
 <body>
+  <div id="banner" role="status" aria-live="polite"></div>
   <main>
     <h1>${title}</h1>
     <p>A detector exported from Lookout. Everything runs in this page: the webcam feed isn't uploaded anywhere.</p>
@@ -126,6 +135,45 @@ export function exportHtml(meta: ExportMetadata): string {
       });
     }
 
+    // Fills {what} and {confidence} in the message set up in Lookout.
+    function renderMessage(template, className, confidence) {
+      return template
+        .replace(/\\{what\\}/g, className)
+        .replace(/\\{confidence\\}/g, Math.round(confidence * 100) + "%");
+    }
+
+    function speak(text, speech) {
+      if (!("speechSynthesis" in window)) return;
+      // Cancel first: a run of fires otherwise queues up and talks over
+      // itself long after the thing that caused it has gone.
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      const voice = speech.voiceURI
+        ? window.speechSynthesis.getVoices().find((v) => v.voiceURI === speech.voiceURI)
+        : null;
+      if (voice) {
+        utterance.voice = voice;
+        utterance.lang = voice.lang; // some engines ignore the voice without this
+      }
+      utterance.rate = speech.rate || 1;
+      utterance.pitch = speech.pitch || 1;
+      window.speechSynthesis.speak(utterance);
+    }
+
+    let bannerTimer = null;
+    function showBanner(text) {
+      const banner = document.getElementById("banner");
+      banner.textContent = text;
+      banner.classList.add("show");
+      clearTimeout(bannerTimer);
+      bannerTimer = setTimeout(() => banner.classList.remove("show"), 6000);
+    }
+
+    function notify(title, body) {
+      if (!("Notification" in window) || Notification.permission !== "granted") return;
+      new Notification(title, { body });
+    }
+
     (async () => {
       const status = document.getElementById("status");
       const startButton = document.getElementById("start");
@@ -163,6 +211,14 @@ export function exportHtml(meta: ExportMetadata): string {
 
       async function start() {
         startButton.disabled = true;
+        // Needs a click to be allowed at all, and this one is it.
+        if (
+          (trigger.clientActions || []).includes("notify") &&
+          "Notification" in window &&
+          Notification.permission === "default"
+        ) {
+          await Notification.requestPermission();
+        }
         try {
           video.srcObject = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
           await video.play();
@@ -215,7 +271,7 @@ export function exportHtml(meta: ExportMetadata): string {
             if (held >= trigger.dwellSeconds && cooled && armed) {
               lastFired = now;
               if (requireAfterIndex >= 0) armed = false;
-              onDetected(metadata.labels[watchIndex], scores[watchIndex]);
+              onDetected(metadata.labels[watchIndex], scores[watchIndex], trigger, metadata.name);
             }
           } else if (scores[watchIndex] <= trigger.releaseThreshold) {
             heldSince = null;
@@ -228,10 +284,20 @@ export function exportHtml(meta: ExportMetadata): string {
       document.getElementById("status").textContent = "Couldn't start: " + err.message;
     });
 
-    // Replace this with whatever should happen: call an API, play a sound, etc.
-    function onDetected(label, score) {
+    // Fires the same on-device reactions Lookout offers: speech, a banner and
+    // a browser notification, whichever were turned on when this was
+    // exported. Slack, Discord, webhooks and email need a server to keep
+    // their target secret, so they're app-only and don't appear here; add
+    // your own call here for those.
+    function onDetected(label, score, trigger, detectorName) {
+      const message = renderMessage(trigger.template || "Lookout saw {what} ({confidence})", label, score);
       document.getElementById("fired").textContent =
-        \`Saw "\${label}" (\${Math.round(score * 100)}%) at \${new Date().toLocaleTimeString()}\`;
+        \`\${message} (\${new Date().toLocaleTimeString()})\`;
+
+      const actions = trigger.clientActions || [];
+      if (actions.includes("speak")) speak(message, trigger.speech || {});
+      if (actions.includes("banner")) showBanner(message);
+      if (actions.includes("notify")) notify(detectorName, message);
     }
   </script>
 </body>
@@ -256,6 +322,8 @@ A detector exported from [Lookout](https://lookout.vision) on ${meta.exportedAt.
 Open \`index.html\` in Chrome, Edge or Firefox and press **Start camera**. It needs an internet connection the first time, to load TensorFlow.js and the MobileNet feature model from their CDNs.
 
 You can also serve the folder, for example with \`npx serve\`, and open the address it prints. The page then loads \`metadata.json\` and \`model/model.json\` directly.
+
+When it sees what it's watching for, it reacts the same way it did in Lookout: speaking, a banner, a browser notification, whichever of those were turned on when this was exported. Slack, Discord, webhook and email reactions don't carry over, since keeping their target secret needs a server this page doesn't have; \`onDetected()\` in \`index.html\` is where to add your own.
 
 ## What's in the folder
 
