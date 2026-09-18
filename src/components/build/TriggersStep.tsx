@@ -503,7 +503,7 @@ export default function TriggersStep({
                 <p className="mt-2 text-xs leading-relaxed text-muted">
                   {rule.requireAfterClassId
                     ? `Seeing “${gateClassName}” arms it. It then triggers the next time “${activeClassName}” holds for long enough, and won't trigger again until it has seen “${gateClassName}” once more.`
-                    : `Triggers whenever “${activeClassName}” holds for long enough, and again every cooldown while it keeps holding. Pick a group here to trigger once per change instead of repeating.`}
+                    : `Triggers whenever “${activeClassName}” holds for long enough, and again every cooldown while it keeps holding. Pick a group here and it will only trigger again once that group has been seen.`}
                 </p>
                 {rule.requireAfterClassId && (
                   <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-xl border border-transparent px-1 py-1.5 transition-colors hover:border-border hover:bg-surface-raised">
