@@ -15,6 +15,7 @@ import {
   type ClientActionId,
 } from "@/lib/triggerActions";
 import { TriggerEngine } from "@/lib/triggerEngine";
+import { useMediaDevices } from "@/lib/useMediaDevices";
 import AttentionOverlay, { AttentionToggle, useAttention } from "@/components/build/AttentionOverlay";
 import ProgressBar from "@/components/build/ProgressBar";
 import WatchTile, { type WatchStatus } from "@/components/build/WatchTile";
@@ -59,6 +60,16 @@ export default function RunDetector({ slug }: { slug: string }) {
   const [actions, setActions] = useState<Set<ClientActionId>>(new Set());
   const [banner, setBanner] = useState<string | null>(null);
   const [log, setLog] = useState<Array<{ at: string; text: string }>>([]);
+  /**
+   * Two ids, deliberately. `selected` is the viewer's own choice and is what
+   * remounts the tile, since a tile's device is fixed once it starts. `active`
+   * is whichever camera actually opened, which is the only way to know what the
+   * browser picked on its own. Keeping them apart stops the resolved id from
+   * feeding back into the tile's key and restarting the camera forever.
+   */
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(undefined);
+  const [activeDeviceId, setActiveDeviceId] = useState<string | undefined>(undefined);
+  const { cameras, hasLabels, refresh: refreshDevices } = useMediaDevices();
 
   const attention = useAttention(phase === "ready");
   const attentionOnRef = useRef(attention.on);
@@ -143,8 +154,27 @@ export default function RunDetector({ slug }: { slug: string }) {
     videoRef.current = video;
   }, []);
 
-  const onStatus = useCallback((_uid: string, status: WatchStatus) => {
-    setCameraRunning(status === "running");
+  const onStatus = useCallback(
+    (_uid: string, status: WatchStatus, resolvedId?: string) => {
+      setCameraRunning(status === "running");
+      if (status !== "running") return;
+      // Camera names are blank until permission has been granted once, so the
+      // picker has nothing worth showing until a camera is actually running.
+      void refreshDevices();
+      if (resolvedId) setActiveDeviceId(resolvedId);
+    },
+    [refreshDevices],
+  );
+
+  const switchCamera = useCallback((nextId: string) => {
+    setSelectedDeviceId(nextId);
+    // The tile remounts, so the loop restarts. Clear the engine with it: the
+    // smoothed scores and dwell clock belong to the camera being left behind,
+    // and arming should behave like a fresh start, the same as stopping and
+    // starting again does.
+    engineRef.current?.reset();
+    setEngineState(null);
+    setWatchScore(null);
   }, []);
 
   useEffect(() => {
@@ -278,11 +308,18 @@ export default function RunDetector({ slug }: { slug: string }) {
       </header>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] lg:items-start">
-        <div className="relative">
+        <div>
+          <div className="relative">
           <WatchTile
+            // A tile's camera is fixed once it starts, so picking another one
+            // remounts the tile rather than swapping the stream underneath it.
+            key={selectedDeviceId ?? "default"}
             uid={CAMERA_ID}
+            deviceId={selectedDeviceId}
             label="Camera"
-            autoStart={false}
+            // The first camera waits for a click, so the permission prompt is
+            // never a surprise. After that, a switch should just happen.
+            autoStart={selectedDeviceId !== undefined}
             compact={false}
             score={watchScore}
             seeing={!!engineState?.condition}
@@ -296,6 +333,37 @@ export default function RunDetector({ slug }: { slug: string }) {
           {attention.on && cameraRunning && maps && leader >= 0 && (
             <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
               <AttentionOverlay map={maps[leader]} />
+            </div>
+          )}
+          </div>
+
+          {/* Names are blank until camera permission has been granted once, so
+              before that there is nothing to tell the cameras apart by. */}
+          {cameras.length > 1 && hasLabels && (
+            <div className="mt-3 rounded-2xl border border-border bg-surface p-4">
+              <label htmlFor="run-camera" className="text-xs font-semibold text-foreground">
+                Camera
+              </label>
+              <select
+                id="run-camera"
+                value={selectedDeviceId ?? activeDeviceId ?? ""}
+                onChange={(e) => switchCamera(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-border-strong bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-accent"
+              >
+                {selectedDeviceId === undefined && activeDeviceId === undefined && (
+                  <option value="">Default camera</option>
+                )}
+                {cameras.map((camera, index) => (
+                  <option key={camera.deviceId} value={camera.deviceId}>
+                    {camera.label || `Camera ${index + 1}`}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-2 text-[11px] leading-relaxed text-muted">
+                Switching restarts the detector on the new camera. If this one sees things from a
+                different angle, distance or light than the photos it was trained on, it may be less
+                accurate.
+              </p>
             </div>
           )}
         </div>
