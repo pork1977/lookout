@@ -380,6 +380,8 @@ export default function TriggersStep({
   const activeDeviceIds = cameras.map((c) => c.deviceId).filter((id): id is string => !!id);
 
   const activeClassName = classes[classIndex]?.name || "Untitled group";
+  const gateClassName =
+    classes.find((c) => c.id === rule.requireAfterClassId)?.name || "Untitled group";
   const previewMessage = renderMessage(template, activeClassName, 0.92);
 
   const dwellProgress = engineState
@@ -451,13 +453,13 @@ export default function TriggersStep({
                 hint="Short for “someone walked up behind me”. Minutes for “I've left my desk”."
               />
               <NumberField
-                label="Then wait before firing again"
+                label="Then wait before triggering again"
                 suffix="seconds"
                 value={rule.cooldownSeconds}
                 min={0}
                 max={86400}
                 onChange={(cooldownSeconds) => setRule((r) => ({ ...r, cooldownSeconds }))}
-                hint="Without a cooldown it would fire on every frame for as long as the condition holds."
+                hint="Without a cooldown it would trigger on every frame for as long as the condition holds."
               />
             </div>
 
@@ -500,12 +502,8 @@ export default function TriggersStep({
                 </div>
                 <p className="mt-2 text-xs leading-relaxed text-muted">
                   {rule.requireAfterClassId
-                    ? `Arms once it's seen "${
-                        classes.find((c) => c.id === rule.requireAfterClassId)?.name || "Untitled group"
-                      }", then fires the next time the condition above holds. After that it needs to see "${
-                        classes.find((c) => c.id === rule.requireAfterClassId)?.name || "Untitled group"
-                      }" again before it can fire once more, however long you stay in view. Use this for “notice when I come back”, rather than “notice repeatedly while I'm here”.`
-                    : "Fires whenever the condition above holds, and again every cooldown for as long as it keeps holding. Pick a group here to make it fire once per visit instead of repeating."}
+                    ? `Seeing “${gateClassName}” arms it. It then triggers the next time “${activeClassName}” holds for long enough, and won't trigger again, however long “${activeClassName}” carries on, until it has seen “${gateClassName}” once more. One trigger per change from “${gateClassName}” to “${activeClassName}”, rather than a repeat every cooldown.`
+                    : `Triggers whenever “${activeClassName}” holds for long enough, and again every cooldown for as long as it keeps holding. Pick a group here and it will only trigger once each time it changes from that group to “${activeClassName}”, instead of repeating.`}
                 </p>
                 {rule.requireAfterClassId && (
                   <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-xl border border-transparent px-1 py-1.5 transition-colors hover:border-border hover:bg-surface-raised">
@@ -516,10 +514,9 @@ export default function TriggersStep({
                       className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
                     />
                     <span className="text-xs leading-relaxed text-muted">
-                      <span className="text-foreground">Allow it to fire right away</span> the first
-                      time watching starts, without waiting to see &ldquo;
-                      {classes.find((c) => c.id === rule.requireAfterClassId)?.name || "Untitled group"}
-                      &rdquo; first. Off by default, so a fresh start doesn&apos;t count as an arrival on
+                      <span className="text-foreground">Allow it to trigger right away</span> the
+                      first time watching starts, without waiting to see &ldquo;{gateClassName}
+                      &rdquo; first. Off by default, so starting up doesn&apos;t count as a change on
                       its own.
                     </span>
                   </label>
@@ -558,7 +555,7 @@ export default function TriggersStep({
                 <p className="mt-2 text-xs leading-relaxed text-muted">
                   {rule.combine === "any"
                     ? "Use this for “something is there” rules, or when the cameras watch different places. One camera not seeing the dog doesn't mean the dog isn't there."
-                    : "Use this for “nothing is there” rules such as “I've left my desk”, where one camera still seeing you means it shouldn't fire. A camera that can only partly see is ignored rather than blocking it."}
+                    : "Use this for “nothing is there” rules such as “I've left my desk”, where one camera still seeing you means it shouldn't trigger. A camera that can only partly see is ignored rather than blocking it."}
                 </p>
               </div>
             )}
@@ -821,11 +818,9 @@ export default function TriggersStep({
                 {!armed
                   ? "Set your conditions, then start watching."
                   : engineState?.cooling
-                    ? "Just fired, holding off for the cooldown."
+                    ? "Just triggered, holding off for the cooldown."
                     : rule.requireAfterClassId && !engineState?.armed
-                      ? `Waiting to see "${
-                          classes.find((c) => c.id === rule.requireAfterClassId)?.name || "Untitled group"
-                        }" first.`
+                      ? `Waiting to see “${gateClassName}” first.`
                       : engineState?.condition
                         ? `Holding, ${(engineState.held / 1000).toFixed(1)}s of ${rule.dwellSeconds}s`
                         : "Waiting to see it."}

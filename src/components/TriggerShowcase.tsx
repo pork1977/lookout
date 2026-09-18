@@ -18,7 +18,7 @@ const triggers = [
   {
     name: "Speak out loud",
     tag: "Home",
-    body: "Speaks a phrase you write, such as “Why thank you, I'll enjoy that tea!”, when it fires.",
+    body: "Speaks a phrase you write, such as “Why thank you, I'll enjoy that tea!”, when it triggers.",
     icon: (p: SVGProps<SVGSVGElement>) => (
       <IconBase {...p}>
         <path d="M4 9v6h4l5 4V5L8 9H4Z" />
@@ -107,7 +107,7 @@ export default function TriggerShowcase() {
       <div className="mx-auto max-w-6xl px-6">
         <div className="max-w-2xl">
           <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-            Pick what happens when it fires
+            Pick what happens when it triggers
           </h2>
           <p className="mt-4 text-muted">
             A detector can run one action or several at the same time.

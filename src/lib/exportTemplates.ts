@@ -54,6 +54,8 @@ export function exportHtml(meta: ExportMetadata): string {
       padding: 8px 10px; font-size: 0.9rem; max-width: 100%;
     }
     #cameraPicker p { font-size: 0.8rem; margin: 6px 0 0; }
+    #cameraHint { display: none; font-size: 0.8rem; margin: 14px 0 0; max-width: 46rem; }
+    #cameraHint code { background: #141a17; border: 1px solid #24302b; border-radius: 6px; padding: 1px 5px; }
   </style>
 </head>
 <body>
@@ -72,6 +74,12 @@ export function exportHtml(meta: ExportMetadata): string {
         result.
       </p>
     </div>
+    <p id="cameraHint">
+      Opened straight from a file, this page isn't allowed to see which cameras you have, so there's
+      no camera picker and it uses whichever camera the browser hands it. Granting permission doesn't
+      change that. To choose a camera, serve this folder instead: run <code>npx serve</code> in it and
+      open the address that prints.
+    </p>
     <div class="layout">
       <video id="camera" playsinline muted></video>
       <div>
@@ -220,6 +228,7 @@ export function exportHtml(meta: ExportMetadata): string {
 
       const cameraPicker = document.getElementById("cameraPicker");
       const cameraSelect = document.getElementById("cameraSelect");
+      const cameraHint = document.getElementById("cameraHint");
       // Set once a camera is actually running, from the stream itself, not
       // from the picker: on the very first start there's nothing picked yet
       // and the browser chooses, so this is how the picker finds out what it
@@ -234,8 +243,18 @@ export function exportHtml(meta: ExportMetadata): string {
         const cams = devices.filter((d) => d.kind === "videoinput");
         if (cams.length < 2) {
           cameraPicker.style.display = "none";
+          // A page opened from a file has an opaque ("null") origin, and a
+          // browser won't give one of those the real device list: whatever is
+          // plugged in, enumerateDevices returns one blank entry per kind, and
+          // granting camera permission doesn't change it, because there's no
+          // real origin to hang that permission on. Blank ids are how that
+          // state is recognised, as opposed to genuinely having one camera.
+          const redacted = cams.every((cam) => !cam.deviceId);
+          cameraHint.style.display =
+            location.protocol === "file:" && redacted ? "block" : "none";
           return;
         }
+        cameraHint.style.display = "none";
         cameraSelect.textContent = "";
         cams.forEach((cam, i) => {
           const option = document.createElement("option");
@@ -385,6 +404,8 @@ A detector exported from [Lookout](https://lookout.vision) on ${meta.exportedAt.
 Open \`index.html\` in Chrome, Edge or Firefox and press **Start camera**. It needs an internet connection the first time, to load TensorFlow.js and the MobileNet feature model from their CDNs.
 
 You can also serve the folder, for example with \`npx serve\`, and open the address it prints. The page then loads \`metadata.json\` and \`model/model.json\` directly.
+
+Serving is worth it if you have more than one camera. A page opened from a file has an opaque origin, and browsers don't give those the real camera list: \`enumerateDevices()\` returns a single blank entry no matter how many cameras are connected, and granting permission doesn't change it. So opened from disk there's no camera picker and you get whichever camera the browser picks; served over http, the picker appears.
 
 When it sees what it's watching for, it reacts the same way it did in Lookout: speaking, a banner, a browser notification, whichever of those were turned on when this was exported. Slack, Discord, webhook and email reactions don't carry over, since keeping their target secret needs a server this page doesn't have; \`onDetected()\` in \`index.html\` is where to add your own.
 

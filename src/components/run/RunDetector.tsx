@@ -373,7 +373,7 @@ export default function RunDetector({ slug }: { slug: string }) {
               {gateGroup && (
                 <>
                   {" "}
-                  Only fires after it&apos;s first seen{" "}
+                  Only triggers after it&apos;s first seen{" "}
                   <span className="text-accent">{gateGroup.name || "Untitled group"}</span>.
                 </>
               )}
@@ -384,7 +384,7 @@ export default function RunDetector({ slug }: { slug: string }) {
                 {!armed
                   ? "Start watching when you're ready. Keep this tab open and in front."
                   : engineState?.cooling
-                    ? "Just fired, holding off for the cooldown."
+                    ? "Just triggered, holding off for the cooldown."
                     : gateGroup && !engineState?.armed
                       ? `Waiting to see "${gateGroup.name || "Untitled group"}" first.`
                       : engineState?.condition
