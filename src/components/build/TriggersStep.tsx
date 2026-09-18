@@ -502,8 +502,8 @@ export default function TriggersStep({
                 </div>
                 <p className="mt-2 text-xs leading-relaxed text-muted">
                   {rule.requireAfterClassId
-                    ? `Seeing “${gateClassName}” arms it. It then triggers the next time “${activeClassName}” holds for long enough, and won't trigger again, however long “${activeClassName}” carries on, until it has seen “${gateClassName}” once more. One trigger per change from “${gateClassName}” to “${activeClassName}”, rather than a repeat every cooldown.`
-                    : `Triggers whenever “${activeClassName}” holds for long enough, and again every cooldown for as long as it keeps holding. Pick a group here and it will only trigger once each time it changes from that group to “${activeClassName}”, instead of repeating.`}
+                    ? `Seeing “${gateClassName}” arms it. It then triggers the next time “${activeClassName}” holds for long enough, and won't trigger again until it has seen “${gateClassName}” once more.`
+                    : `Triggers whenever “${activeClassName}” holds for long enough, and again every cooldown while it keeps holding. Pick a group here to trigger once per change instead of repeating.`}
                 </p>
                 {rule.requireAfterClassId && (
                   <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-xl border border-transparent px-1 py-1.5 transition-colors hover:border-border hover:bg-surface-raised">
