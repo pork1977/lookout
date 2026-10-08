@@ -29,15 +29,22 @@ export interface ThemeDefinition {
   swatch: string;
 }
 
+/**
+ * Backgrounds carry less of the hue than they used to and sit darker, while
+ * the accents went up to nearly full chroma. That pairing is the whole trick:
+ * a saturated accent on a saturated background of the same hue reads muddy,
+ * because the two are competing, and the accent only looks vivid once the
+ * surface behind it gets out of its way.
+ */
 export const THEMES: ThemeDefinition[] = [
-  { id: "light", label: "Light", group: "base", mode: "light", hue: 150, bgSat: 8, swatch: "#5cf2a3" },
-  { id: "dark", label: "Dark", group: "base", mode: "dark", hue: 150, bgSat: 10, swatch: "#5cf2a3" },
-  { id: "blue", label: "Blue", group: "color", mode: "dark", hue: 213, bgSat: 55, swatch: "#3b9dff" },
-  { id: "purple", label: "Purple", group: "color", mode: "dark", hue: 265, bgSat: 45, swatch: "#a879ff" },
-  { id: "amber", label: "Amber", group: "color", mode: "dark", hue: 28, bgSat: 42, swatch: "#ff9d42" },
-  { id: "rose", label: "Rose", group: "color", mode: "dark", hue: 340, bgSat: 42, swatch: "#ff5c94" },
-  { id: "teal", label: "Teal", group: "color", mode: "dark", hue: 184, bgSat: 45, swatch: "#2ee6d6" },
-  { id: "lime", label: "Lime", group: "color", mode: "dark", hue: 78, bgSat: 30, swatch: "#b8f03c" },
+  { id: "light", label: "Light", group: "base", mode: "light", hue: 150, bgSat: 18, swatch: "#1be07f" },
+  { id: "dark", label: "Dark", group: "base", mode: "dark", hue: 150, bgSat: 12, swatch: "#31f69a" },
+  { id: "blue", label: "Blue", group: "color", mode: "dark", hue: 213, bgSat: 40, swatch: "#338bff" },
+  { id: "purple", label: "Purple", group: "color", mode: "dark", hue: 265, bgSat: 38, swatch: "#a25cff" },
+  { id: "amber", label: "Amber", group: "color", mode: "dark", hue: 28, bgSat: 40, swatch: "#ff8f1f" },
+  { id: "rose", label: "Rose", group: "color", mode: "dark", hue: 340, bgSat: 38, swatch: "#ff3d77" },
+  { id: "teal", label: "Teal", group: "color", mode: "dark", hue: 184, bgSat: 40, swatch: "#06f9e4" },
+  { id: "lime", label: "Lime", group: "color", mode: "dark", hue: 78, bgSat: 28, swatch: "#b9f924" },
 ];
 
 export const DEFAULT_THEME = "dark";
