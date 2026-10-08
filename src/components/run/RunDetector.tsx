@@ -8,6 +8,7 @@ import { disposeHead, loadExtractor, readFrame } from "@/lib/trainer";
 import {
   notificationPermission,
   notify,
+  primeSpeech,
   renderMessage,
   requestNotificationPermission,
   speak,
@@ -16,6 +17,7 @@ import {
 } from "@/lib/triggerActions";
 import { TriggerEngine } from "@/lib/triggerEngine";
 import { useMediaDevices } from "@/lib/useMediaDevices";
+import { useWakeLock } from "@/lib/useWakeLock";
 import AttentionOverlay, { AttentionToggle, useAttention } from "@/components/build/AttentionOverlay";
 import ProgressBar from "@/components/build/ProgressBar";
 import WatchTile, { type WatchStatus } from "@/components/build/WatchTile";
@@ -70,6 +72,20 @@ export default function RunDetector({ slug }: { slug: string }) {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(undefined);
   const [activeDeviceId, setActiveDeviceId] = useState<string | undefined>(undefined);
   const { cameras, hasLabels, refresh: refreshDevices } = useMediaDevices();
+  const [notifyPermission, setNotifyPermission] = useState<NotificationPermission | "unsupported">(
+    "default",
+  );
+
+  // A phone that locks its screen suspends the page, which stops the camera
+  // and the loop reading from it. Held only while actually watching.
+  useWakeLock(armed && cameraRunning);
+
+  useEffect(() => {
+    // Notification.permission has no value that is safe to read during SSR and
+    // no change event to subscribe to, so reading it once on mount is it.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNotifyPermission(notificationPermission());
+  }, []);
 
   const attention = useAttention(phase === "ready");
   const attentionOnRef = useRef(attention.on);
@@ -106,7 +122,19 @@ export default function RunDetector({ slug }: { slug: string }) {
           loaded.settings.rule.cooldownSeconds,
         );
         setDetector(loaded);
-        setActions(new Set(loaded.settings.clientActions));
+        // The share says what it wanted to happen, this device says what it
+        // can do. Ticking something the browser will never perform, which is
+        // what a notification is in an ordinary iPhone tab, is worse than not
+        // offering it: it looks set up and then stays silent.
+        setActions(
+          new Set(
+            loaded.settings.clientActions.filter(
+              (action) =>
+                (action !== "speak" || speechSupported()) &&
+                (action !== "notify" || notificationPermission() === "granted"),
+            ),
+          ),
+        );
         setPhase("ready");
       } catch (err) {
         if (cancelled) return;
@@ -230,8 +258,11 @@ export default function RunDetector({ slug }: { slug: string }) {
     }
     if (actions.has("notify") && notificationPermission() === "default") {
       // Asked here because it needs a click to be allowed at all.
-      await requestNotificationPermission();
+      setNotifyPermission(await requestNotificationPermission());
     }
+    // Same reason, for speech: this click is the user gesture iOS wants to see
+    // before it will say anything later from the prediction loop.
+    if (actions.has("speak")) primeSpeech();
     engineRef.current = new TriggerEngine(detector.settings.rule);
     armedRef.current = true;
     setArmed(true);
@@ -450,7 +481,7 @@ export default function RunDetector({ slug }: { slug: string }) {
               <ProgressBar value={dwellProgress} active={!!engineState?.condition} />
               <p className="mt-2 text-xs text-muted">
                 {!armed
-                  ? "Start watching when you're ready. Keep this tab open and in front."
+                  ? "Start watching when you're ready. Keep this tab open and in front. On a phone it will hold the screen awake, because a locked screen stops the camera and nothing is watched while it's off."
                   : engineState?.cooling
                     ? "Just triggered, holding off for the cooldown."
                     : gateGroup && !engineState?.armed
@@ -463,15 +494,35 @@ export default function RunDetector({ slug }: { slug: string }) {
 
             <div className="mt-4 space-y-1.5 border-t border-border pt-4">
               {ACTIONS.map((action) => {
-                const supported = action.id !== "speak" || speechSupported();
+                const unavailable =
+                  action.id === "speak"
+                    ? !speechSupported()
+                    : action.id === "notify"
+                      ? notifyPermission === "unsupported" || notifyPermission === "denied"
+                      : false;
                 return (
-                  <label key={action.id} className="flex cursor-pointer items-center gap-2.5 text-sm text-foreground">
+                  <label
+                    key={action.id}
+                    className={`flex items-start gap-2.5 text-sm text-foreground ${
+                      unavailable ? "cursor-not-allowed" : "cursor-pointer"
+                    }`}
+                  >
                     <input
                       type="checkbox"
                       checked={actions.has(action.id)}
-                      disabled={!supported}
-                      onChange={(e) => {
+                      disabled={unavailable}
+                      onChange={async (e) => {
+                        // Captured before the await: this is a controlled
+                        // input, so React repaints it back while a permission
+                        // prompt is open and reading it afterwards is too late.
                         const wanted = e.target.checked;
+                        if (wanted && action.id === "notify") {
+                          const permission = await requestNotificationPermission();
+                          setNotifyPermission(permission);
+                          // Ticking a box that can't do anything is worse than
+                          // not ticking it.
+                          if (permission !== "granted") return;
+                        }
                         setActions((prev) => {
                           const next = new Set(prev);
                           if (wanted) next.add(action.id);
@@ -479,9 +530,28 @@ export default function RunDetector({ slug }: { slug: string }) {
                           return next;
                         });
                       }}
-                      className="h-4 w-4 accent-[var(--accent)]"
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent)] disabled:opacity-40"
                     />
-                    {action.label}
+                    <span className="min-w-0">
+                      <span className={unavailable ? "text-muted" : undefined}>{action.label}</span>
+                      {action.id === "speak" && unavailable && (
+                        <span className="block text-xs text-muted">
+                          This browser can&apos;t speak.
+                        </span>
+                      )}
+                      {action.id === "notify" && notifyPermission === "denied" && (
+                        <span className="block text-xs text-muted">
+                          Blocked for this site in your browser settings.
+                        </span>
+                      )}
+                      {action.id === "notify" && notifyPermission === "unsupported" && (
+                        <span className="block text-xs text-muted">
+                          Not available in this browser. On an iPhone or iPad, notifications only
+                          work once a site has been added to the Home Screen, through Share then Add
+                          to Home Screen. Speech and the banner work either way.
+                        </span>
+                      )}
+                    </span>
                   </label>
                 );
               })}

@@ -60,11 +60,38 @@ export function pickDefaultVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesi
   );
 }
 
+/**
+ * iOS only speaks if the page's first utterance came from a user gesture, and
+ * a detector's first real one never does: it arrives from the prediction loop
+ * several minutes later, by which point iOS silently drops it and every one
+ * after it. Speaking a silent utterance from the click that starts watching
+ * unlocks the engine for the rest of the session.
+ */
+export function primeSpeech() {
+  if (!speechSupported()) return;
+  try {
+    // iOS can also leave the engine paused after a backgrounded tab.
+    window.speechSynthesis.resume();
+    const utterance = new SpeechSynthesisUtterance(" ");
+    utterance.volume = 0;
+    window.speechSynthesis.speak(utterance);
+  } catch {
+    /* an engine that refuses to be primed may still work when it matters */
+  }
+}
+
 export function speak(text: string, options: SpeechOptions = {}) {
   if (!speechSupported()) return;
-  // Cancel first: a run of fires otherwise queues up and talks over itself long
-  // after the thing has gone.
-  window.speechSynthesis.cancel();
+  // Cancel first: a run of triggers otherwise queues up and talks over itself
+  // long after the thing has gone. Only when something is actually queued,
+  // because cancel() immediately followed by speak() is itself a way to lose
+  // the utterance on iOS.
+  if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+    window.speechSynthesis.cancel();
+  }
+  // A tab that was backgrounded can come back paused, and speak() on a paused
+  // engine queues silently rather than talking.
+  window.speechSynthesis.resume();
 
   const utterance = new SpeechSynthesisUtterance(text);
   const voices = window.speechSynthesis.getVoices();

@@ -10,12 +10,14 @@ import {
   type TriggerRule,
 } from "@/lib/triggerEngine";
 import { useMediaDevices } from "@/lib/useMediaDevices";
+import { useWakeLock } from "@/lib/useWakeLock";
 import type { TriggerSettings } from "@/lib/triggerSettings";
 import {
   dispatch,
   notificationPermission,
   notify,
   pickDefaultVoice,
+  primeSpeech,
   renderMessage,
   requestNotificationPermission,
   speak,
@@ -151,6 +153,10 @@ export default function TriggersStep({
   const [log, setLog] = useState<Array<{ at: string; text: string; seenBy?: string; error?: string }>>([]);
 
   const { cameras: devices, hasLabels, refresh: refreshDevices } = useMediaDevices();
+
+  // A phone that locks its screen suspends the page, stopping the cameras and
+  // the loop that reads them.
+  useWakeLock(armed);
 
   // The loop reads these through refs so adding or removing a camera changes
   // what it reads on the next tick without restarting it, which would reset
@@ -804,7 +810,13 @@ export default function TriggersStep({
                 {armed ? "Watching" : "Not watching"}
               </span>
               <button
-                onClick={() => setArmed((v) => !v)}
+                onClick={() => {
+                  // iOS wants a user gesture before it will ever speak, and the
+                  // first real utterance comes from the prediction loop, which
+                  // is not one. This click is.
+                  if (!armed && clientActions.has("speak")) primeSpeech();
+                  setArmed((v) => !v);
+                }}
                 disabled={!anyRunning}
                 className="rounded-full border border-border-strong px-4 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-40"
               >
