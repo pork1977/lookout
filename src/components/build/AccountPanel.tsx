@@ -13,6 +13,7 @@ import {
   type SyncProgress,
 } from "@/lib/cloudSync";
 import * as store from "@/lib/detectorStore";
+import { track } from "@/lib/analytics";
 import ProgressBar from "./ProgressBar";
 
 export const OPEN_ACCOUNT_EVENT = "lookout:open-account";
@@ -214,6 +215,7 @@ export default function AccountPanel({
                       });
                       if (error) throw new Error(error.message);
                       setPassword("");
+                      track("account_created", { confirmed: Boolean(data.session) });
                       // With email confirmation on, there's no session yet and
                       // nothing appears to happen unless we say so.
                       if (!data.session) setMessage("Check your email to confirm the account.");

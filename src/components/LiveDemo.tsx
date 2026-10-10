@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CameraTile from "./live-demo/CameraTile";
 import CameraPicker from "./live-demo/CameraPicker";
 import DetectionList from "./live-demo/DetectionList";
+import { trackOnce } from "@/lib/analytics";
 import { useMediaDevices } from "@/lib/useMediaDevices";
 import { useThemeColor } from "@/lib/useThemeColor";
 import type { DetectionGroup, TrackedDetection } from "./live-demo/types";
@@ -88,6 +89,9 @@ export default function LiveDemo() {
 
   const handlePrimaryStart = useCallback(
     (deviceId?: string) => {
+      // First real signal that a visitor did more than read: the homepage demo
+      // has a camera running. No device id or label goes with it.
+      trackOnce("live_demo_started");
       refresh();
       if (deviceId) {
         setSlots((prev) => [{ ...prev[0], deviceId }, ...prev.slice(1)]);

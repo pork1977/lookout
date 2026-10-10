@@ -12,6 +12,7 @@ import {
   type TrainedHead,
   type TrainingSample,
 } from "@/lib/trainer";
+import { accuracyBand, countBand, track } from "@/lib/analytics";
 import AttentionOverlay, { AttentionToggle, useAttention } from "./AttentionOverlay";
 import ProgressBar from "./ProgressBar";
 import type { DetectorClass } from "./types";
@@ -79,6 +80,8 @@ export default function TrainStep({
   const train = useCallback(async () => {
     setError(null);
     setEpoch(null);
+    // Counted out here so the failure path can report it too.
+    const total = classes.reduce((n, c) => n + c.examples.length, 0);
     try {
       setPhase("loading-model");
       await loadExtractor();
@@ -86,8 +89,8 @@ export default function TrainStep({
       setPhase("embedding");
       const cache = embeddingCacheRef.current;
       const samples: TrainingSample[] = [];
-      const total = classes.reduce((n, c) => n + c.examples.length, 0);
       setPrepared({ done: 0, total });
+      track("training_started", { photos: countBand(total), groups: classes.length });
 
       let done = 0;
       for (const [classIndex, cls] of classes.entries()) {
@@ -112,9 +115,16 @@ export default function TrainStep({
       // The wizard owns the head, and disposes whichever one this replaces.
       onTrained(trained);
       setPhase("trained");
+      track("detector_trained", {
+        photos: countBand(total),
+        groups: classes.length,
+        accuracy: accuracyBand(trained.finalAccuracy),
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Training failed.");
       setPhase("error");
+      // No message goes with this. A failure message can carry a file name.
+      track("training_failed", { photos: countBand(total), groups: classes.length });
     }
   }, [classes, onTrained]);
 

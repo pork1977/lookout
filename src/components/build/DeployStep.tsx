@@ -12,6 +12,7 @@ import {
 import { getSupabase } from "@/lib/supabaseClient";
 import type { TrainedHead } from "@/lib/trainer";
 import type { TriggerSettings } from "@/lib/triggerSettings";
+import { track } from "@/lib/analytics";
 import { OPEN_ACCOUNT_EVENT } from "./AccountPanel";
 import type { DetectorClass } from "./types";
 
@@ -87,6 +88,9 @@ export default function DeployStep({
         settings,
       });
       setShare(result);
+      // No slug: a share link is a capability, and holding it is permission
+      // to run that detector.
+      track("share_link_created", { groups: classes.length });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't share it.");
     } finally {
@@ -125,6 +129,8 @@ export default function DeployStep({
       });
       const megabytes = (result.bytes / (1024 * 1024)).toFixed(1);
       setExportNote(`Downloaded ${result.fileName} (${megabytes}MB). Unzip it and open index.html.`);
+      // The file name is the detector's name, so only the size goes out.
+      track("detector_exported", { megabytes: Number(megabytes) });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't export it.");
     } finally {

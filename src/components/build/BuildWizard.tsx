@@ -11,6 +11,7 @@ import { MAX_CLASSES, MIN_CLASSES, type DetectorClass, type ExampleImage } from 
 import AccountPanel from "./AccountPanel";
 import DetectorLibrary from "./DetectorLibrary";
 import { disposeHead, loadHead, saveHead, type TrainedHead } from "@/lib/trainer";
+import { trackOnce } from "@/lib/analytics";
 import * as store from "@/lib/detectorStore";
 import type { Preset } from "@/lib/presets";
 import {
@@ -68,6 +69,15 @@ export default function BuildWizard() {
   }, []);
 
   useEffect(() => () => disposeHead(headRef.current), []);
+
+  /**
+   * The question analytics has to answer is how far a stranger got, so each
+   * step counts once per visit. Stepping back and forth would otherwise read
+   * as several different people arriving at Examples.
+   */
+  useEffect(() => {
+    trackOnce("build_step_reached", { step: step + 1, name: STEPS[step] });
+  }, [step]);
 
   const newId = useCallback((prefix: string) => {
     nextId.current += 1;

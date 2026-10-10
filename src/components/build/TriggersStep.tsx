@@ -27,6 +27,7 @@ import {
   type ServerActionId,
   type SpeechOptions,
 } from "@/lib/triggerActions";
+import { trackOnce } from "@/lib/analytics";
 import { AttentionToggle, useAttention } from "./AttentionOverlay";
 import ProgressBar from "./ProgressBar";
 import type { DetectorClass } from "./types";
@@ -276,6 +277,11 @@ export default function TriggersStep({
               .join(", ")
           : undefined;
       setLog((prev) => [{ at, text: message, seenBy: seenByLabel || undefined }, ...prev].slice(0, 8));
+
+      // The end of the funnel: a detector someone trained has just gone off in
+      // front of them. Once per visit, because a detector that fires every
+      // cooldown for an hour is still one person who got it working.
+      trackOnce("detector_fired", { cameras: camerasRef.current.length });
 
       if (clientActions.has("speak")) speak(message, speech);
       if (clientActions.has("notify")) notify(detectorName || "Lookout", message);
@@ -815,6 +821,16 @@ export default function TriggersStep({
                   // first real utterance comes from the prediction loop, which
                   // is not one. This click is.
                   if (!armed && clientActions.has("speak")) primeSpeech();
+                  if (!armed) {
+                    // Which kinds of action were picked, not what they say or
+                    // where they point. A webhook URL is the user's business.
+                    trackOnce("watch_started", {
+                      cameras: cameras.length,
+                      actions:
+                        clientActions.size +
+                        Object.values(serverTargets).filter((t) => t.trim()).length,
+                    });
+                  }
                   setArmed((v) => !v);
                 }}
                 disabled={!anyRunning}

@@ -9,6 +9,7 @@ import {
   type LabelRequestImage,
   type LabelResult,
 } from "@/lib/labeling";
+import { countBand, track } from "@/lib/analytics";
 import ProgressBar from "./ProgressBar";
 import type { DetectorClass, ExampleImage } from "./types";
 
@@ -81,6 +82,9 @@ export default function ReviewStep({
 
     const batches = batchImages(selected);
     setProgress({ done: 0, total: selected.length });
+    // The one thing on the site that spends money per use, so it is worth
+    // knowing how often it actually gets used.
+    track("ai_labelling_used", { photos: countBand(selected.length) });
 
     const collected: Record<string, Verdict> = {};
     let failures = 0;
