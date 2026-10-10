@@ -9,7 +9,7 @@ export default function robots(): MetadataRoute.Robots {
       // for whoever they were sent to, not for search results. The pages
       // also carry a noindex meta tag; this keeps crawlers from fetching
       // them in the first place.
-      disallow: ["/run/", "/api/"],
+      disallow: ["/run/", "/api/", "/admin"],
     },
     sitemap: "https://lookout.vision/sitemap.xml",
   };
