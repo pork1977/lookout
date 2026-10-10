@@ -24,12 +24,6 @@ export default function Header() {
           <Link href="/#faq" className="transition-colors hover:text-foreground">
             FAQ
           </Link>
-          <a
-            href="https://github.com/pork1977/lookout"
-            className="transition-colors hover:text-foreground"
-          >
-            GitHub
-          </a>
         </nav>
         <div className="flex items-center gap-3">
           <ThemeSwitcher />

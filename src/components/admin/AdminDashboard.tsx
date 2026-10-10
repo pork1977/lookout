@@ -218,10 +218,35 @@ export default function AdminDashboard() {
       {error && <p className="text-xs text-red-400">{error}</p>}
 
       <Panel title="How far people got">
-        <p className="mb-4 text-xs text-muted">
+        <p className="mb-3 text-xs text-muted">
           One row per visit, grouped by where it came from. The last column is the one that
           matters: trained a detector <em>and</em> watched it fire.
         </p>
+        <Info summary="What the sources and columns mean">
+          <Term name="direct">
+            No tag on the link they arrived through. Someone typing the address, a bookmark,
+            a link in a chat app, or a post where the link was shared without a tag. Expect
+            this to be the biggest row until you start tagging links.
+          </Term>
+          <Term name="anything else">
+            Exactly the <code>utm_source</code> you put on the link. Posting{" "}
+            <code>lookout.vision/?utm_source=hn</code> makes a row called <code>hn</code>. You
+            invent the names, so keep them consistent: <code>hn</code> today and{" "}
+            <code>hackernews</code> next month are two different rows.
+          </Term>
+          <Term name="Visits">
+            One per page load, not per person. Someone who closes the tab and comes back
+            tomorrow is two visits, because nothing is stored on their device to recognise
+            them by. A hard reload mid-way also starts a new visit.
+          </Term>
+          <Term name="Opened builder">Visits that got as far as the first step of the builder.</Term>
+          <Term name="Trained">Visits where a detector finished training.</Term>
+          <Term name="Trained and saw it fire">
+            Visits that trained one <em>and</em> watched it trigger. This is the number the
+            whole thing exists to show. It is deliberately stricter than counting triggers,
+            which would also count someone reopening a detector they made last week.
+          </Term>
+        </Info>
         {funnel.length === 0 ? (
           <Empty />
         ) : (
@@ -239,10 +264,26 @@ export default function AdminDashboard() {
       </Panel>
 
       <Panel title="What happened">
-        <p className="mb-4 text-xs text-muted">
-          Every event in the window. Sessions counts each visit once, however many times it
-          did the thing.
+        <p className="mb-3 text-xs text-muted">
+          Every event in the window. Visits counts each one once, however many times it did
+          the thing.
         </p>
+        <Info summary="What these events are">
+          <Term name="Page viewed">Any page opening, including moving between pages without a reload.</Term>
+          <Term name="Live demo started">The homepage demo got a camera running, so they let it see them.</Term>
+          <Term name="Builder step reached">
+            Any one of the six wizard steps came into view. Counted once per step per visit,
+            so walking back and forth doesn&rsquo;t inflate it.
+          </Term>
+          <Term name="AI labelling used">
+            The one thing on the site that costs money per use, so worth watching.
+          </Term>
+          <Term name="Detector fired">A trained detector triggered in front of someone.</Term>
+          <Term name="Run link created / Detector exported">
+            Someone wanted the detector somewhere other than this tab, which is the clearest
+            signal of a thing they intend to keep.
+          </Term>
+        </Info>
         {counts.length === 0 ? (
           <Empty />
         ) : (
@@ -270,6 +311,31 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
       <h2 className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted">{title}</h2>
       <div className="mt-3">{children}</div>
     </section>
+  );
+}
+
+/**
+ * A disclosure rather than a tooltip: this is read once to learn what a
+ * column means and then never again, and a hover tooltip is both unreachable
+ * on a phone and awkward to read several sentences out of.
+ */
+function Info({ summary, children }: { summary: string; children: React.ReactNode }) {
+  return (
+    <details className="mb-4 rounded-xl border border-border bg-background/40 px-3 py-2 [&[open]_summary]:mb-2">
+      <summary className="cursor-pointer select-none text-xs font-medium text-muted hover:text-foreground">
+        {summary}
+      </summary>
+      <dl className="space-y-2 pb-1">{children}</dl>
+    </details>
+  );
+}
+
+function Term({ name, children }: { name: string; children: React.ReactNode }) {
+  return (
+    <div className="text-xs leading-relaxed">
+      <dt className="inline font-semibold text-foreground">{name}: </dt>
+      <dd className="inline text-muted">{children}</dd>
+    </div>
   );
 }
 

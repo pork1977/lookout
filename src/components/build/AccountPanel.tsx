@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import type { User } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabaseClient";
 import {
@@ -40,6 +41,8 @@ export default function AccountPanel({
   const [localCounts, setLocalCounts] = useState<Record<string, number>>({});
   const [confirmRestore, setConfirmRestore] = useState<CloudDetector | null>(null);
   const [confirmBackup, setConfirmBackup] = useState<CloudDetector | null>(null);
+  /** Whether to offer the admin page. The database refuses non-admins anyway, this just hides a dead link. */
+  const [adminFlag, setAdminFlag] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -50,6 +53,11 @@ export default function AccountPanel({
     });
     return () => sub.subscription.unsubscribe();
   }, [supabase]);
+
+  useEffect(() => {
+    if (!supabase || !user) return;
+    supabase.rpc("is_admin").then(({ data, error }) => setAdminFlag(!error && Boolean(data)));
+  }, [supabase, user]);
 
   // Other steps (Deploy) can ask for the panel instead of telling people to
   // go and find it.
@@ -86,6 +94,9 @@ export default function AccountPanel({
   }, [user, refreshCloud]);
 
   const missingHere = cloud.filter((item) => !localIds.has(item.localId)).length;
+  // Derived rather than cleared on sign-out, so a signed-out panel can never
+  // still be offering the link.
+  const isAdmin = Boolean(user) && adminFlag;
 
   const runBackup = () =>
     withBusy("Backup", async () => {
@@ -240,12 +251,27 @@ export default function AccountPanel({
                     {cloud.length} backed up detector{cloud.length === 1 ? "" : "s"}
                   </p>
                 </div>
-                <button
-                  onClick={() => withBusy("Sign out", async () => void (await supabase.auth.signOut()))}
-                  className="shrink-0 rounded-full border border-border-strong px-3 py-1 text-[11px] text-foreground hover:bg-surface-raised"
-                >
-                  Sign out
-                </button>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {/* Only shown to admins, which is cosmetic: the page itself
+                      is safe to open, because the database is what refuses
+                      people rather than the link being hidden. */}
+                  {isAdmin && (
+                    <Link
+                      href="/admin"
+                      className="rounded-full border border-border-strong px-3 py-1 text-[11px] text-foreground hover:bg-surface-raised"
+                    >
+                      Admin
+                    </Link>
+                  )}
+                  <button
+                    onClick={() =>
+                      withBusy("Sign out", async () => void (await supabase.auth.signOut()))
+                    }
+                    className="rounded-full border border-border-strong px-3 py-1 text-[11px] text-foreground hover:bg-surface-raised"
+                  >
+                    Sign out
+                  </button>
+                </div>
               </div>
 
               <button
