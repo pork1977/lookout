@@ -53,6 +53,15 @@ export default function DescribeStep({
             placeholder="Notice when I'm on my phone instead of working"
             className="mt-4 w-full resize-y rounded-2xl border border-border-strong bg-surface px-4 py-3 text-base text-foreground outline-none transition-colors placeholder:text-muted focus:border-accent"
           />
+          {/* Picking something the camera cannot see is the likeliest way a
+              first detector fails, and it looks like the tool being wrong
+              rather than the idea being impossible. Cheaper to say here than
+              to let someone find out after training one. */}
+          <p className="mt-3 text-xs leading-relaxed text-muted">
+            Worth checking before you start: the camera has to be able to see the difference from
+            where it sits. One at desk height can tell there&apos;s a mug in front of you, but not
+            that it&apos;s empty.
+          </p>
         </section>
 
         <section>
