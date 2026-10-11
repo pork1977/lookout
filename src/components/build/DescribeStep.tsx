@@ -41,12 +41,16 @@ export default function DescribeStep({
           <p className="mt-1.5 text-sm text-muted">
             Write it in your own words. It becomes the detector&apos;s name and helps guide the labelling step.
           </p>
+          {/* The placeholder is the first example anyone reads, so it has to
+              be one their own camera can actually see. "My mug is empty"
+              needs a view down into the mug, which a webcam at desk height
+              never has, so it taught people to fail on their first try. */}
           <textarea
             id="detector-description"
             value={description}
             onChange={(e) => onDescriptionChange(e.target.value)}
             rows={3}
-            placeholder="Notice when my coffee mug is empty"
+            placeholder="Notice when I'm on my phone instead of working"
             className="mt-4 w-full resize-y rounded-2xl border border-border-strong bg-surface px-4 py-3 text-base text-foreground outline-none transition-colors placeholder:text-muted focus:border-accent"
           />
         </section>

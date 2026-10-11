@@ -2,9 +2,15 @@
  * Starter ideas, shared by the homepage gallery and the builder's first step.
  *
  * Each one carries its own class names rather than deriving them from the
- * description: "Notice when my coffee mug is empty" needs the pair
- * "Empty mug" / "Mug has coffee", and no amount of string munging gets there.
- * Good defaults here are what stop someone stalling on the blank-page problem.
+ * description: "Notice when I'm on my phone instead of working" needs the
+ * pair "On my phone" / "Not on my phone", and no amount of string munging
+ * gets there. Good defaults here are what stop someone stalling on the
+ * blank-page problem.
+ *
+ * Every idea here has to be one a webcam at desk height can actually see
+ * from where it sits. An earlier "my coffee mug is empty" failed that: it
+ * needs a view down into the mug, so anyone who picked it trained a detector
+ * that could not work and reasonably blamed the tool.
  */
 export interface Preset {
   id: string;
@@ -87,12 +93,6 @@ export const PRESET_CATEGORIES: PresetCategory[] = [
         label: "When I've left my desk for a while",
         description: "Notice when I've left my desk for a while",
         classes: ["Desk is empty", "I'm at my desk"],
-      },
-      {
-        id: "empty-mug",
-        label: "When my coffee mug is empty",
-        description: "Notice when my coffee mug is empty",
-        classes: ["Empty mug", "Mug has coffee"],
       },
     ],
   },
