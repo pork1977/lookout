@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { callerKey, consumeImageQuota } from "@/lib/imageQuota";
@@ -7,6 +8,7 @@ import {
   LABELING_MODEL,
   MAX_IMAGES_PER_REQUEST,
   MAX_IMAGES_PER_RUN,
+  MONTHLY_LABEL_ALLOWANCE,
   UNCLEAR_LABEL,
   correlateLabels,
   type LabelRequestBody,
@@ -22,13 +24,63 @@ const ALLOWED_MEDIA_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 /** Enough for 12 short verdicts; a truncated array is treated as a failed batch. */
 const MAX_TOKENS = 2048;
 
+function accountsConfigured() {
+  return !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+}
+
 export function GET() {
   return NextResponse.json({
-    available: !!process.env.ANTHROPIC_API_KEY,
+    // Accounts are part of availability now, not a separate concern: without
+    // them there is no durable way to meter this, and an unmetered route
+    // spends the site owner's Anthropic key on anyone who finds it.
+    available: !!process.env.ANTHROPIC_API_KEY && accountsConfigured(),
     model: LABELING_MODEL,
     maxImagesPerRequest: MAX_IMAGES_PER_REQUEST,
     maxImagesPerRun: MAX_IMAGES_PER_RUN,
+    monthlyAllowance: MONTHLY_LABEL_ALLOWANCE,
   });
+}
+
+/**
+ * Spends the caller's monthly allowance, or says why not.
+ *
+ * The token is checked by the database rather than here: PostgREST verifies
+ * the JWT, and the function reads auth.uid() from it, so a forged or expired
+ * token can't spend anyone's allowance. One round trip answers both "are they
+ * signed in" and "have they got any left".
+ */
+async function spendAllowance(
+  token: string,
+  images: number,
+): Promise<{ ok: true; remaining: number } | { ok: false; status: number; error: string }> {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL as string,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
+    {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    },
+  );
+
+  const { data, error } = await supabase.rpc("consume_label_quota", { p_images: images });
+
+  if (error) {
+    // 42501 is the function refusing an unauthenticated caller; PostgREST
+    // answers PGRST301 for a token that is expired or malformed.
+    if (error.code === "42501" || error.code === "PGRST301") {
+      return { ok: false, status: 401, error: "Sign in to use AI labelling." };
+    }
+    if (error.code === "P0001") {
+      return {
+        ok: false,
+        status: 429,
+        error: `That's this month's labelling allowance of ${MONTHLY_LABEL_ALLOWANCE} photos used up. It resets on the 1st, and you can still label by hand.`,
+      };
+    }
+    return { ok: false, status: 502, error: "Couldn't check your labelling allowance." };
+  }
+
+  return { ok: true, remaining: typeof data === "number" ? data : 0 };
 }
 
 export async function POST(request: Request) {
@@ -50,6 +102,21 @@ export async function POST(request: Request) {
   const invalid = validate(body);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 400 });
 
+  if (!accountsConfigured()) {
+    return NextResponse.json(
+      { error: "AI labelling needs accounts configured on this deployment." },
+      { status: 503 },
+    );
+  }
+
+  const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
+  if (!token) {
+    return NextResponse.json({ error: "Sign in to use AI labelling." }, { status: 401 });
+  }
+
+  // Still per-IP first, and still only in memory. It is no longer the thing
+  // standing between a stranger and the API key, just a cheap way to stop a
+  // burst before it reaches the database or Anthropic.
   const quota = consumeImageQuota(callerKey(request.headers), body.images.length);
   if (!quota.ok) {
     return NextResponse.json(
@@ -62,13 +129,18 @@ export async function POST(request: Request) {
     );
   }
 
+  const allowance = await spendAllowance(token, body.images.length);
+  if (!allowance.ok) {
+    return NextResponse.json({ error: allowance.error }, { status: allowance.status });
+  }
+
   // Constructed per request, not at module scope: a missing key then can't
   // throw at import time and take the whole route down.
   const client = new Anthropic({ apiKey });
 
   try {
     const results = await labelBatch(client, body);
-    return NextResponse.json({ results });
+    return NextResponse.json({ results, remaining: allowance.remaining });
   } catch (err) {
     if (err instanceof Anthropic.AuthenticationError) {
       return NextResponse.json(

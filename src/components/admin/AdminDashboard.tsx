@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabaseClient";
+import { countingSkipped, setCountingSkipped } from "@/lib/analytics";
 
 /**
  * The numbers from the events table, for whoever is listed in public.admins.
@@ -63,6 +64,7 @@ export default function AdminDashboard() {
   const [loadedFor, setLoadedFor] = useState<number | null>(null);
   const [reloads, setReloads] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [skipping, setSkipping] = useState(false);
 
   // Signing out has to drop the previous answer, and deriving it rather than
   // clearing it in an effect keeps that impossible to get wrong.
@@ -87,9 +89,14 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (!supabase || !user) return;
-    supabase
-      .rpc("is_admin")
-      .then(({ data, error: rpcError }) => setAdminFlag(rpcError ? false : Boolean(data)));
+    supabase.rpc("is_admin").then(({ data, error: rpcError }) => {
+      const admin = !rpcError && Boolean(data);
+      setAdminFlag(admin);
+      // Reaching this page as an admin is as clear a signal as there is that
+      // this browser belongs to whoever runs the site, so it stops being
+      // counted from here on. Reversible with the switch below.
+      setSkipping(admin ? setCountingSkipped(true) : countingSkipped());
+    });
   }, [supabase, user]);
 
   useEffect(() => {
@@ -216,6 +223,28 @@ export default function AdminDashboard() {
       </div>
 
       {error && <p className="text-xs text-red-400">{error}</p>}
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
+        <p className="text-xs text-muted">
+          {skipping ? (
+            <>
+              This browser <span className="font-semibold text-foreground">isn&rsquo;t counted</span>.
+              Your own visits stay out of the numbers above.
+            </>
+          ) : (
+            <>
+              This browser <span className="font-semibold text-foreground">is being counted</span>,
+              so your own visits are in the numbers above.
+            </>
+          )}
+        </p>
+        <button
+          onClick={() => setSkipping(setCountingSkipped(!skipping))}
+          className="shrink-0 rounded-full border border-border-strong px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-surface-raised"
+        >
+          {skipping ? "Count this browser" : "Stop counting this browser"}
+        </button>
+      </div>
 
       <Panel title="How far people got">
         <p className="mb-3 text-xs text-muted">

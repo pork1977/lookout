@@ -2,7 +2,7 @@ export const faqs = [
   {
     question: "Is Lookout free to use?",
     answer:
-      "Training and detection run in your browser and don't cost anything. AI-assisted labelling and email triggers depend on keys the site owner configures, and are disabled with a clear note if they aren't set up.",
+      "Training and detection run in your browser and don't cost anything. AI-assisted labelling runs on the site owner's Anthropic key, so it needs a free account and is capped at 600 photos a month. Email triggers depend on keys the site owner configures, and anything that isn't set up is disabled with a clear note rather than failing quietly.",
   },
   {
     question: "Do I need to write code or collect a dataset?",
@@ -17,7 +17,7 @@ export const faqs = [
   {
     question: "Do I need an account?",
     answer:
-      "No. Detectors are saved in your browser as you work. An account is only needed if you want to back a detector up and restore it on another machine.",
+      "Not to build or run a detector. Detectors are saved in your browser as you work. An account is needed for two things: backing a detector up so you can restore it on another machine, and AI-assisted labelling, which spends the site owner's Anthropic key and so comes with a monthly allowance.",
   },
   {
     question: "What can a detector do when it sees what it's trained for?",

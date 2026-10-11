@@ -24,6 +24,36 @@ const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
  */
 const LIVE_HOSTS = ["lookout.vision", "www.lookout.vision"];
 
+/**
+ * Set on the owner's own browser, so that working on the site all day doesn't
+ * fill the funnel with its author. Visiting /admin as an admin sets it, and
+ * there is a switch there to turn counting back on.
+ *
+ * This is the one thing written to anybody's device, it is per-browser, it
+ * holds no identity, and nothing reads it but the check below.
+ */
+const SKIP_KEY = "lookout.skip-counting";
+
+export function countingSkipped(): boolean {
+  try {
+    return localStorage.getItem(SKIP_KEY) === "1";
+  } catch {
+    // Private windows and blocked site data both throw rather than return null.
+    return false;
+  }
+}
+
+/** Returns what the setting ended up as, which is not always what was asked for. */
+export function setCountingSkipped(skip: boolean): boolean {
+  try {
+    if (skip) localStorage.setItem(SKIP_KEY, "1");
+    else localStorage.removeItem(SKIP_KEY);
+  } catch {
+    // Nothing to do: a browser that won't store it simply keeps counting.
+  }
+  return countingSkipped();
+}
+
 export type LookoutEvent =
   /** Any page opened, including client-side navigation. The top of the funnel. */
   | "page_viewed"
@@ -62,7 +92,8 @@ let source: string | null = null;
 function enabled(): boolean {
   if (!url || !anonKey) return false;
   if (typeof window === "undefined") return false;
-  return LIVE_HOSTS.includes(window.location.hostname);
+  if (!LIVE_HOSTS.includes(window.location.hostname)) return false;
+  return !countingSkipped();
 }
 
 function session(): string {

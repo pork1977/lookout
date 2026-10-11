@@ -20,6 +20,16 @@ export const CLIENT_BATCH_SIZE = 6;
 export const MAX_IMAGES_PER_RUN = 120;
 
 /**
+ * Photos per account per calendar month. Five full runs, which is more than
+ * anyone building a detector or two gets through, and little enough that an
+ * account cannot run up a bill on the site owner's Anthropic key.
+ *
+ * The real enforcement is in the database, in consume_label_quota. This copy
+ * exists so the UI can say the number out loud. Keep them in step.
+ */
+export const MONTHLY_LABEL_ALLOWANCE = 600;
+
+/**
  * Above this, and only when Claude agrees with where the photo already is, a
  * photo is treated as confirmed and never shown for review.
  *
@@ -65,6 +75,7 @@ export interface LabelAvailability {
   model: string;
   maxImagesPerRequest: number;
   maxImagesPerRun: number;
+  monthlyAllowance?: number;
 }
 
 /** Splits a list into request-sized batches. */

@@ -10,6 +10,9 @@ import {
   type LabelResult,
 } from "@/lib/labeling";
 import { countBand, track } from "@/lib/analytics";
+import { getSupabase } from "@/lib/supabaseClient";
+import { MONTHLY_LABEL_ALLOWANCE } from "@/lib/labeling";
+import { OPEN_ACCOUNT_EVENT } from "./AccountPanel";
 import ProgressBar from "./ProgressBar";
 import type { DetectorClass, ExampleImage } from "./types";
 
@@ -52,6 +55,9 @@ export default function ReviewStep({
   const [skipped, setSkipped] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [resolved, setResolved] = useState<Set<string>>(new Set());
+  const [needsAccount, setNeedsAccount] = useState(false);
+  /** Photos left in this month's allowance, once a run has told us. */
+  const [remaining, setRemaining] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -69,7 +75,17 @@ export default function ReviewStep({
   }, []);
 
   const run = useCallback(async () => {
+    // The route spends the site owner's Anthropic key, so it is behind an
+    // account now. Checking here first turns a 401 into a sentence and a
+    // button rather than an error the person has to interpret.
+    const session = (await getSupabase()?.auth.getSession())?.data.session ?? null;
+    if (!session) {
+      setNeedsAccount(true);
+      return;
+    }
+
     setState("running");
+    setNeedsAccount(false);
     setError(null);
     setVerdicts({});
     setResolved(new Set());
@@ -102,7 +118,10 @@ export default function ReviewStep({
       try {
         const response = await fetch("/api/label", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
           body: JSON.stringify({
             description,
             classes: classes.map((c) => ({ id: c.id, name: c.name })),
@@ -110,7 +129,14 @@ export default function ReviewStep({
           }),
         });
         const payload = await response.json();
+        if (response.status === 401) {
+          // The session went stale between the check above and the call.
+          setNeedsAccount(true);
+          setState("idle");
+          return;
+        }
         if (!response.ok) throw new Error(payload?.error ?? "Labelling failed.");
+        if (typeof payload.remaining === "number") setRemaining(payload.remaining);
 
         for (const result of payload.results as LabelResult[]) {
           const source = batch.find((b) => b.example.id === result.id);
@@ -207,8 +233,27 @@ export default function ReviewStep({
           </button>
           <p className="mt-3 text-xs text-muted">
             Photos are sent to Anthropic for this step only, and aren&apos;t stored. Up to{" "}
-            {MAX_IMAGES_PER_RUN} photos per run.
+            {MAX_IMAGES_PER_RUN} photos per run, and{" "}
+            {remaining === null ? `${MONTHLY_LABEL_ALLOWANCE} a month` : `${remaining} left`} on a
+            free account. Training itself needs no account and no labelling.
           </p>
+
+          {needsAccount && (
+            <div className="mt-4 rounded-xl border border-border-strong bg-surface-raised p-4">
+              <p className="text-sm text-foreground">This step needs a free account.</p>
+              <p className="mt-1.5 text-xs leading-relaxed text-muted">
+                It runs on the site owner&apos;s Anthropic key, so it is tied to an account and
+                an allowance of {MONTHLY_LABEL_ALLOWANCE} photos a month. Everything else here,
+                including the training itself, works signed out.
+              </p>
+              <button
+                onClick={() => window.dispatchEvent(new Event(OPEN_ACCOUNT_EVENT))}
+                className="mt-3 rounded-full border border-border-strong px-4 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-surface"
+              >
+                Open the account panel
+              </button>
+            </div>
+          )}
         </div>
       )}
 
