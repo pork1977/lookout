@@ -82,6 +82,39 @@ function normalize(
   });
 }
 
+/**
+ * A much smaller frame, for the history of what a detector caught.
+ *
+ * Deliberately not EXAMPLE_SIZE: these accumulate one per trigger rather than
+ * a handful per detector, so 320px at 0.85 would put megabytes a day into
+ * someone's browser for pictures nobody trains on. 160px is plenty to
+ * recognise the moment, and lands around 6KB.
+ */
+const THUMB_SIZE = 160;
+const THUMB_QUALITY = 0.6;
+
+export function frameToThumbnail(video: HTMLVideoElement): Promise<Blob> {
+  const canvas = document.createElement("canvas");
+  drawNormalized(video, video.videoWidth, video.videoHeight, MIRROR_CAMERA_FRAMES, canvas);
+
+  // Drawn at the canonical size first and then stepped down, so the thumbnail
+  // is the same square crop as everything else rather than a second framing.
+  const small = document.createElement("canvas");
+  small.width = THUMB_SIZE;
+  small.height = THUMB_SIZE;
+  const ctx = small.getContext("2d");
+  if (!ctx) return Promise.reject(new Error("Canvas 2D is unavailable in this browser."));
+  ctx.drawImage(canvas, 0, 0, THUMB_SIZE, THUMB_SIZE);
+
+  return new Promise((resolve, reject) => {
+    small.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("Could not encode the image."))),
+      "image/jpeg",
+      THUMB_QUALITY,
+    );
+  });
+}
+
 /** Grabs the current frame from a playing video element. */
 export function frameToBlob(video: HTMLVideoElement): Promise<Blob> {
   return normalize(video, video.videoWidth, video.videoHeight, MIRROR_CAMERA_FRAMES);

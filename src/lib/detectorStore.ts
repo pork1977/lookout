@@ -16,10 +16,18 @@
  */
 
 const DB_NAME = "lookout";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const DETECTORS = "detectors";
 const EXAMPLES = "examples";
+const HISTORY = "history";
 const BY_DETECTOR = "byDetector";
+
+/**
+ * How many triggers are kept per detector. A detector watching all day with a
+ * 60s cooldown tops out around 1,400 a day, so without a ceiling this grows
+ * without bound. 300 is a few days of real use, and the oldest fall off.
+ */
+const HISTORY_LIMIT = 300;
 
 export interface DetectorRecord {
   id: string;
@@ -53,6 +61,28 @@ export interface ExampleRecord {
   createdAt: number;
 }
 
+/**
+ * One thing a detector noticed. Written when a trigger fires, so that closing
+ * the tab and coming back tomorrow still shows what it caught.
+ *
+ * Local only, like the photos. The group name is stored as it read at the
+ * time rather than as an id, because renaming a group later should not
+ * silently rewrite what yesterday's alert said.
+ */
+export interface HistoryRecord {
+  id: string;
+  detectorId: string;
+  at: number;
+  className: string;
+  confidence: number;
+  /** The rendered alert text, so the history says what the person was told. */
+  message: string;
+  /** Short camera labels, only when more than one camera was watching. */
+  cameras?: string;
+  /** A 160px JPEG of the moment, when a frame could be grabbed. */
+  thumb?: Blob;
+}
+
 export function storageSupported(): boolean {
   return typeof indexedDB !== "undefined";
 }
@@ -72,6 +102,12 @@ function openDb(): Promise<IDBDatabase> {
           const store = db.createObjectStore(EXAMPLES, { keyPath: "id" });
           // Without this index, loading one detector's photos means scanning
           // every photo of every detector.
+          store.createIndex(BY_DETECTOR, "detectorId", { unique: false });
+        }
+        // Added in version 2. Existing browsers get it on their next visit
+        // without touching the detectors or photos already stored.
+        if (!db.objectStoreNames.contains(HISTORY)) {
+          const store = db.createObjectStore(HISTORY, { keyPath: "id" });
           store.createIndex(BY_DETECTOR, "detectorId", { unique: false });
         }
       };
@@ -154,6 +190,9 @@ export async function deleteExamplesForClass(detectorId: string, classId: string
 export async function deleteDetector(id: string): Promise<void> {
   const examples = await listExamples(id);
   await Promise.all(examples.map((e) => deleteExample(e.id)));
+  // Its history goes with it. Leaving orphaned entries behind would keep
+  // thumbnails of a deleted detector in the browser indefinitely.
+  await clearHistory(id);
   await run(DETECTORS, "readwrite", (store) => store.delete(id));
   await deleteModel(id);
 }
@@ -165,6 +204,62 @@ export async function deleteDetector(id: string): Promise<void> {
  * rather than as a blob here, it knows how to serialise weights, and reloading
  * a saved model is what stops a refresh costing another training run.
  */
+/**
+ * Newest first, which is the only order anyone wants to read this in.
+ * `limit` caps what comes back; the store itself is pruned on write.
+ */
+export async function listHistory(detectorId: string, limit = 100): Promise<HistoryRecord[]> {
+  const all = await run<HistoryRecord[]>(HISTORY, "readonly", (store) =>
+    store.index(BY_DETECTOR).getAll(detectorId),
+  );
+  return all.sort((a, b) => b.at - a.at).slice(0, limit);
+}
+
+export async function addHistory(record: HistoryRecord): Promise<void> {
+  await run(HISTORY, "readwrite", (store) => store.put(record));
+  await pruneHistory(record.detectorId);
+}
+
+/**
+ * Drops the oldest entries past the ceiling. Done after the write rather than
+ * before, so a trigger is never lost to a slow tidy-up, and failure here is
+ * swallowed: an over-long history is a far smaller problem than an alert that
+ * throws inside the firing path.
+ */
+async function pruneHistory(detectorId: string): Promise<void> {
+  try {
+    const all = await run<HistoryRecord[]>(HISTORY, "readonly", (store) =>
+      store.index(BY_DETECTOR).getAll(detectorId),
+    );
+    if (all.length <= HISTORY_LIMIT) return;
+    const doomed = all.sort((a, b) => b.at - a.at).slice(HISTORY_LIMIT);
+    const db = await openDb();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(HISTORY, "readwrite");
+      const store = tx.objectStore(HISTORY);
+      doomed.forEach((item) => store.delete(item.id));
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error ?? new Error("Could not tidy the history."));
+    });
+  } catch {
+    /* an over-long history is not worth surfacing to anyone */
+  }
+}
+
+export async function clearHistory(detectorId: string): Promise<void> {
+  const all = await run<HistoryRecord[]>(HISTORY, "readonly", (store) =>
+    store.index(BY_DETECTOR).getAll(detectorId),
+  );
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(HISTORY, "readwrite");
+    const store = tx.objectStore(HISTORY);
+    all.forEach((item) => store.delete(item.id));
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error ?? new Error("Could not clear the history."));
+  });
+}
+
 export function modelUrl(detectorId: string): string {
   return `indexeddb://lookout-head-${detectorId}`;
 }

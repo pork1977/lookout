@@ -28,6 +28,8 @@ import {
   type SpeechOptions,
 } from "@/lib/triggerActions";
 import { trackOnce } from "@/lib/analytics";
+import { recordTrigger } from "@/lib/triggerHistory";
+import CaughtHistory from "./CaughtHistory";
 import { AttentionToggle, useAttention } from "./AttentionOverlay";
 import ProgressBar from "./ProgressBar";
 import type { DetectorClass } from "./types";
@@ -70,6 +72,7 @@ const SERVER_ACTIONS: Array<{ id: ServerActionId; label: string; placeholder: st
 export default function TriggersStep({
   classes,
   head,
+  detectorId,
   detectorName,
   settings,
   onSettingsChange,
@@ -78,6 +81,8 @@ export default function TriggersStep({
 }: {
   classes: DetectorClass[];
   head: TrainedHead | null;
+  /** Null until the detector has been saved, in which case nothing is recorded. */
+  detectorId: string | null;
   detectorName: string;
   /**
    * Owned by the wizard, so the settings survive leaving this step, save with
@@ -152,6 +157,8 @@ export default function TriggersStep({
   const [notifyPermission, setNotifyPermission] = useState<NotificationPermission | "unsupported">("default");
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [log, setLog] = useState<Array<{ at: string; text: string; seenBy?: string; error?: string }>>([]);
+  /** Bumped on every trigger so the saved history re-reads itself. */
+  const [caught, setCaught] = useState(0);
 
   const { cameras: devices, hasLabels, refresh: refreshDevices } = useMediaDevices();
 
@@ -278,6 +285,20 @@ export default function TriggersStep({
           : undefined;
       setLog((prev) => [{ at, text: message, seenBy: seenByLabel || undefined }, ...prev].slice(0, 8));
 
+      // Written before the actions run, not after. A failing webhook must not
+      // be able to lose the record of something the detector genuinely saw.
+      if (detectorId) {
+        const video = videosRef.current.get(seenBy[0]) ?? null;
+        void recordTrigger({
+          detectorId,
+          className,
+          confidence,
+          message,
+          cameras: seenByLabel || undefined,
+          video,
+        }).then(() => setCaught((n) => n + 1));
+      }
+
       // The end of the funnel: a detector someone trained has just gone off in
       // front of them. Once per visit, because a detector that fires every
       // cooldown for an hour is still one person who got it working.
@@ -306,7 +327,7 @@ export default function TriggersStep({
         }
       }
     },
-    [classes, classIndex, template, clientActions, serverTargets, detectorName, speech, labelFor],
+    [classes, classIndex, template, clientActions, serverTargets, detectorId, detectorName, speech, labelFor],
   );
 
   // The prediction loop calls fireRef.current, never `fire` directly, so `fire`
@@ -862,7 +883,7 @@ export default function TriggersStep({
             )}
 
             {log.length > 0 && (
-              <ul className="mt-4 space-y-1.5 border-t border-border pt-4">
+              <ul className="mt-4 space-y-1.5 border-t border-border pt-4" data-live-log>
                 {log.map((entry, i) => (
                   <li key={i} className="text-xs">
                     <span className="font-mono text-muted">{entry.at}</span>{" "}
@@ -876,6 +897,10 @@ export default function TriggersStep({
               </ul>
             )}
           </div>
+
+          {/* Below the live panel rather than inside it: the log above is what
+              is happening now, this is what happened while nobody was here. */}
+          <CaughtHistory detectorId={detectorId} refreshKey={caught} />
         </div>
       </div>
 

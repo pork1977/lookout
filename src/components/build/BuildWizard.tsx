@@ -513,6 +513,7 @@ export default function BuildWizard() {
         <TriggersStep
           classes={classes}
           head={head}
+          detectorId={detectorId}
           detectorName={description || "Lookout"}
           settings={triggerSettings}
           onSettingsChange={updateTriggerSettings}
