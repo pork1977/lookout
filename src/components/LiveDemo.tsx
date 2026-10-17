@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CameraTile from "./live-demo/CameraTile";
 import CameraPicker from "./live-demo/CameraPicker";
 import DetectionList from "./live-demo/DetectionList";
+import DemoVideo from "./DemoVideo";
 import { trackOnce } from "@/lib/analytics";
 import { useMediaDevices } from "@/lib/useMediaDevices";
 import { useThemeColor } from "@/lib/useThemeColor";
@@ -176,6 +177,9 @@ export default function LiveDemo() {
 
   return (
     <div className="w-full">
+      {/* Mounted once here rather than per tile, so there is only ever one of
+          it however many cameras are on screen. */}
+      <DemoVideo />
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         {picker}
         {/* Always available, whatever the camera is doing, it used to appear

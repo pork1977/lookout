@@ -10,6 +10,7 @@ import {
 import { inkFor } from "@/lib/colorInk";
 import { classifyCameraError, openCameraStream } from "@/lib/cameraStream";
 import type { TrackedDetection } from "./types";
+import { WatchDemoButton } from "@/components/DemoVideo";
 
 export const START_DEMO_EVENT = "lookout:start-demo";
 
@@ -543,6 +544,12 @@ function CameraTile({
                   Object detection runs in this tab, and the video isn&apos;t uploaded.
                 </p>
               )}
+              {/* The camera is a big ask on a first visit, and plenty of people
+                  will never press the button. They still deserve to see what
+                  the thing does. */}
+              {!everStarted && !compact && (
+                <WatchDemoButton label="No camera? Watch it work" />
+              )}
             </>
           )}
           {(status === "idle" && autoStart && !everStarted) || status === "requesting-camera" ? (
@@ -571,13 +578,20 @@ function CameraTile({
                   </>
                 )}
               </p>
-              <button
-                onClick={start}
-                className="tile-action shrink-0 whitespace-nowrap rounded-full border border-border-strong font-medium hover:bg-surface-raised"
-                style={{ padding: "0.5em 1.3em" }}
-              >
-                Try again
-              </button>
+              <div className="flex flex-wrap items-center justify-center" style={{ gap: "0.5em" }}>
+                <button
+                  onClick={start}
+                  className="tile-action shrink-0 whitespace-nowrap rounded-full border border-border-strong font-medium hover:bg-surface-raised"
+                  style={{ padding: "0.5em 1.3em" }}
+                >
+                  Try again
+                </button>
+                {/* Someone who just said no to the camera should not be left
+                    with nothing to look at. Only on the primary tile: in the
+                    grid the other tiles are about a second camera failing,
+                    not about never seeing the product at all. */}
+                {!compact && status === "camera-denied" && <WatchDemoButton />}
+              </div>
             </div>
           )}
           {status === "unsupported" && (
